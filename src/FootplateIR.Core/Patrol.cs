@@ -177,8 +177,12 @@ public static class Patrol
         return null;
     }
 
-    /// <summary>Running KM of the train at a given time, from departure / arrival times (uniform speed assumed).</summary>
-    public static Func<double, double>? TrainPosition(InspectionReport r, IList<StationKm> chainage, out double startNm, out double endNm)
+    /// <summary>
+    /// Running KM of the train at a given time. With the train's schedule in the timetable, the scheduled running and halts
+    /// between the two stations are followed (stretched to the actual times); otherwise an even speed is assumed.
+    /// </summary>
+    public static Func<double, double>? TrainPosition(InspectionReport r, IList<StationKm> chainage, out double startNm, out double endNm,
+        IEnumerable<TrainSchedule>? trains = null)
     {
         startNm = endNm = 0;
         var a = KmOf(r.FromStation, chainage);
@@ -187,30 +191,42 @@ public static class Patrol
         startNm = NightMinutes(r.Departure.Value);
         endNm = NightMinutes(r.Arrival.Value);
         if (endNm <= startNm) endNm += 1440;
+        if (Timetable.Find(trains, r.TrainNo) is TrainSchedule t && Timetable.Profile(t, r, chainage) is { } pts)
+            return nm => Timetable.At(pts, nm);
         double s0 = startNm, e0 = endNm, ka = a.Value, kb = b.Value;
         return nm => ka + (kb - ka) * Math.Clamp((nm - s0) / (e0 - s0), 0, 1);
     }
 
+    /// <summary>True when the position comes from the train's schedule rather than an even speed.</summary>
+    public static bool UsesSchedule(InspectionReport r, IList<StationKm> chainage, IEnumerable<TrainSchedule>? trains) =>
+        Timetable.Find(trains, r.TrainNo) is TrainSchedule t && Timetable.Profile(t, r, chainage) is not null;
+
     /// <summary>Approximate time the train passed a KM.</summary>
-    public static TimeOnly? TimeAtKm(InspectionReport r, IList<StationKm> chainage, double km)
+    public static TimeOnly? TimeAtKm(InspectionReport r, IList<StationKm> chainage, double km, IEnumerable<TrainSchedule>? trains = null)
     {
-        var pos = TrainPosition(r, chainage, out var s, out var e);
+        var pos = TrainPosition(r, chainage, out var s, out var e, trains);
         if (pos is null) return null;
         double a = pos(s), b = pos(e);
-        if (Math.Abs(b - a) < 1e-6) return null;
-        var f = (km - a) / (b - a);
-        if (f < -0.02 || f > 1.02) return null;
-        return FromNightMinutes(s + Math.Clamp(f, 0, 1) * (e - s));
+        if (Math.Abs(b - a) < 1e-6 || km < Math.Min(a, b) - 0.3 || km > Math.Max(a, b) + 0.3) return null;
+        double prev = pos(s);
+        for (double nm = s + 0.25; nm <= e + 1e-9; nm += 0.25)
+        {
+            var x = pos(nm);
+            if ((prev - km) * (x - km) <= 0 && Math.Abs(x - prev) > 1e-9)
+                return FromNightMinutes(nm - 0.25 + 0.25 * (km - prev) / (x - prev));
+            prev = x;
+        }
+        return null;
     }
 
     /// <summary>
     /// Every meeting of the train with a patrol pair on the chart, compared with the field staff recorded in the report.
     /// </summary>
     public static List<ChartCheckRow> Check(InspectionReport r, PatrolChart chart, IList<StationKm> chainage, IEnumerable<DutyRoster>? rosters = null,
-        double tolerance = 1.0)
+        double tolerance = 1.0, IEnumerable<TrainSchedule>? trains = null)
     {
         var rows = new List<ChartCheckRow>();
-        var pos = TrainPosition(r, chainage, out var s, out var e);
+        var pos = TrainPosition(r, chainage, out var s, out var e, trains);
         if (pos is null) return rows;
         var night = NightOf(r.Date, r.Departure);
         var duty = (rosters ?? Enumerable.Empty<DutyRoster>()).Where(d => d.Date == night && d.IsNight).ToList();

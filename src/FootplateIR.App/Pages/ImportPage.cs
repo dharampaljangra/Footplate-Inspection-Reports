@@ -11,6 +11,7 @@ public class ImportPage : ContentPage
     private ImportResult? _last;
     private readonly Dictionary<InspectionReport, CheckBox> _pickReports = new();
     private readonly Dictionary<DutyRoster, CheckBox> _pickRosters = new();
+    private readonly Dictionary<TrainSchedule, CheckBox> _pickTrains = new();
 
     public ImportPage()
     {
@@ -18,7 +19,7 @@ public class ImportPage : ContentPage
         Content = Ui.Page(
             Ui.Title("Import reports and duty lists"),
             Ui.Card(Ui.Stack(
-                Ui.Text("Reports written on WhatsApp, typed notes in Word / PDF / Excel, photos of a printed note, and night duty lists of patrolmen / keymen are all read here. A preview is shown before anything is added; reports already saved (same date, train and route) are skipped.", 13),
+                Ui.Text("Reports written on WhatsApp, typed notes in Word / PDF / Excel, photos of a printed note, night duty lists of patrolmen / keymen, and train timings (working time table in Excel, or schedules copied from NTES) are all read here. A preview is shown before anything is added; reports already saved (same date, train and route) are skipped.", 13),
                 Ui.Muted("Files saved by this app (PDF, Word, Excel, HTML) carry an exact copy of the report and come back unchanged.")), Ui.Soft),
             Ui.Wrap(
                 Ui.Button("Paste from clipboard", Paste),
@@ -95,9 +96,10 @@ public class ImportPage : ContentPage
         _last = res;
         _pickReports.Clear();
         _pickRosters.Clear();
+        _pickTrains.Clear();
         _results.Children.Clear();
         _results.Children.Add(Ui.Heading(res.Summary));
-        foreach (var m in res.Messages.Where(m => res.Reports.Count + res.Rosters.Count == 0 || m.StartsWith("No ")))
+        foreach (var m in res.Messages.Where(m => res.Reports.Count + res.Rosters.Count + res.Trains.Count == 0 || m.StartsWith("No ")))
             _results.Children.Add(Ui.Text(m, 13, Ui.Warn));
         var data = DataService.Current.Data;
         foreach (var r in res.Reports)
@@ -128,7 +130,18 @@ public class ImportPage : ContentPage
             s.Spacing = 1;
             _results.Children.Add(Ui.Card(Ui.Row(cb, s)));
         }
-        if (res.Reports.Count + res.Rosters.Count > 0)
+        foreach (var t in res.Trains)
+        {
+            var cb = new CheckBox { IsChecked = true, Color = Ui.Primary };
+            _pickTrains[t] = cb;
+            var known = Timetable.Find(data.Trains, t.TrainNo) is not null;
+            var s = Ui.Stack(
+                Ui.Text($"Train {t.Title}  ({t.Route}, {t.Stops.Count} stops)" + (known ? "  - replaces the saved schedule" : ""), 14, Ui.Primary, true),
+                Ui.Text(string.Join("  ", t.Stops.Take(14).Select(x => $"{x.Code} {Fmt.Time(x.Time)}")) + (t.Stops.Count > 14 ? " ..." : ""), 12));
+            s.Spacing = 1;
+            _results.Children.Add(Ui.Card(Ui.Row(cb, s)));
+        }
+        if (res.Reports.Count + res.Rosters.Count + res.Trains.Count > 0)
             _results.Children.Add(Ui.Button("Add the ticked items", AddSelected));
     }
 
@@ -140,9 +153,11 @@ public class ImportPage : ContentPage
         foreach (var r in reports) if (r.Source.Length == 0) r.Source = _last.Source;
         var (added, skipped) = Store.AddReports(data, reports);
         var (nr, nb) = Patrol.Merge(data.Rosters, _pickRosters.Where(p => p.Value.IsChecked).Select(p => p.Key));
+        var (ta, tu) = Timetable.Merge(data.Trains, _pickTrains.Where(p => p.Value.IsChecked).Select(p => p.Key));
         await DataService.Current.SaveAsync();
         await Ui.Alert("Added", $"{added} report(s) added" + (skipped > 0 ? $", {skipped} already saved" : "") +
-                                (nb > 0 ? $"; duty lists: {nb} beats saved ({nr} new list(s))." : "."));
+                                (nb > 0 ? $"; duty lists: {nb} beats saved ({nr} new list(s))" : "") +
+                                (ta + tu > 0 ? $"; timetable: {ta} train(s) added, {tu} updated" : "") + ".");
         _results.Children.Clear();
         _text.Text = "";
     }

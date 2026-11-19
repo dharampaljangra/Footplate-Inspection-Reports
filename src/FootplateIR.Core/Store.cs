@@ -39,6 +39,7 @@ public static class Store
     {
         d.Masters ??= new Masters();
         d.Settings ??= new Settings();
+        d.Trains ??= new List<TrainSchedule>();
         if (d.Masters.Chainage.Count == 0) d.Masters.Chainage = Patrol.DefaultChainage();
         if (d.Masters.StandardObservations.Count == 0) d.Masters.StandardObservations = new List<string>(Defaults.StandardObservations);
     }
@@ -82,6 +83,12 @@ public static class Store
             var mine = into.Rosters.FirstOrDefault(x => x.Id == r.Id);
             if (mine is null) { into.Rosters.Add(r); s.RostersAdded++; }
             else if (r.ModifiedUtc > mine.ModifiedUtc) into.Rosters[into.Rosters.IndexOf(mine)] = r;
+        }
+        foreach (var t in from.Trains)
+        {
+            var mine = into.Trains.FirstOrDefault(x => x.TrainNo == t.TrainNo);
+            if (mine is null) into.Trains.Add(t);
+            else if (t.ModifiedUtc > mine.ModifiedUtc) into.Trains[into.Trains.IndexOf(mine)] = t;
         }
         foreach (var c in from.Charts.Where(c => into.Charts.All(x => x.Id != c.Id && x.Name != c.Name)))
         {

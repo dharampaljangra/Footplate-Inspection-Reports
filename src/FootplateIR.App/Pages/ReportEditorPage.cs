@@ -81,6 +81,7 @@ public class ReportEditorPage : ContentPage
         }
 
         Fill();
+        _train.Unfocused += async (_, _) => await FillFromTimetable(force: false);
         _dep.TextChanged += (_, _) => ShowDuration();
         _arr.TextChanged += (_, _) => ShowDuration();
         _from.TextChanged += (_, _) => ShowDuration();
@@ -96,6 +97,10 @@ public class ReportEditorPage : ContentPage
                 Ui.Cols(Ui.Field("Train No.", _train), Ui.Field("Train name", _trainName)),
                 Ui.Cols(Ui.Field("Departure (hhmm)", _dep), Ui.Field("Arrival (hhmm)", _arr)),
                 _duration,
+                Ui.Wrap(
+                    Ui.Small("Times from timetable", () => FillFromTimetable(force: true)),
+                    Ui.Small("NTES (live running)", () => NtesPage.OpenAsync(Navigation, (_train.Text ?? "").Trim())),
+                    Ui.Small("Trains passing (timetable)", () => Navigation.PushAsync(new TimetablePage()))),
                 Ui.Cols(Ui.Field("Inspected by", _name), Ui.Field("Designation", _desig)),
                 Ui.Cols(Ui.Field("Mobile", _mobile), Ui.Field("Section", _section)))),
             Ui.Card(Ui.Stack(
@@ -231,6 +236,32 @@ public class ReportEditorPage : ContentPage
         var names = $"{Stations.NameOf(t.FromStation, D.Masters) ?? ""} → {Stations.NameOf(t.ToStation, D.Masters) ?? ""}".Trim(' ', '→');
         _duration.Text = (t.Duration is TimeSpan ts ? $"On the footplate {Fmt.Duration(ts)}" : "") +
                          (km is double k ? $"   •   about {k:0.0} km" : "") + (names.Length > 0 ? $"   •   {names}" : "");
+    }
+
+    /// <summary>Scheduled departure / arrival of the train (and its name) from the timetable kept in the app.</summary>
+    private async Task FillFromTimetable(bool force)
+    {
+        var t = Timetable.Find(D.Trains, _train.Text);
+        if (t is null)
+        {
+            if (force) await Ui.Alert("Timetable", $"Train {(_train.Text ?? "").Trim()} is not in the timetable. Load the timings under 'Train timings', or look it up on NTES.");
+            return;
+        }
+        var from = (_from.Text ?? "").Trim().ToUpperInvariant();
+        var to = (_to.Text ?? "").Trim().ToUpperInvariant();
+        if ((_trainName.Text ?? "").Length == 0 && t.Name.Length > 0) _trainName.Text = t.Name;
+        if (from.Length == 0 || to.Length == 0)
+        {
+            if (force) await Ui.Alert("Timetable", "Enter the From and To stations first.");
+            return;
+        }
+        var (dep, arr) = Timetable.TimesFor(t, from, to);
+        if (force || (_dep.Text ?? "").Length == 0) if (dep is TimeOnly d) _dep.Text = d.ToString("HHmm", Ui.Inv);
+        if (force || (_arr.Text ?? "").Length == 0) if (arr is TimeOnly a) _arr.Text = a.ToString("HHmm", Ui.Inv);
+        if (force && (dep is null || arr is null))
+            await Ui.Alert("Timetable", $"The schedule of {t.TrainNo} does not have {(dep is null ? from : to)}. Correct it under 'Train timings'.");
+        else if (force)
+            await Ui.Alert("Timetable", "Scheduled times filled in - change them to the actual times of your run.");
     }
 
     private void RefreshSightings()

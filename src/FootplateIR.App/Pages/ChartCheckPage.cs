@@ -22,7 +22,7 @@ public class ChartCheckPage : ContentPage
         }
         if (!chart.AppliesTo(night))
             stack.Children.Add(Ui.Card(Ui.Text($"Note: {chart.Name} is for {Fmt.Date(chart.ValidFrom ?? DateOnly.MinValue)} to {Fmt.Date(chart.ValidTo ?? DateOnly.MaxValue)}; this report is of the night of {Patrol.NightText(night)}. Shown for reference only.", 13, Ui.Warn), Ui.WarnBack));
-        var rows = Patrol.Check(r, chart, data.Masters.Chainage, data.Rosters, data.Settings.ChartToleranceKm);
+        var rows = Patrol.Check(r, chart, data.Masters.Chainage, data.Rosters, data.Settings.ChartToleranceKm, data.Trains);
         if (rows.Count == 0)
         {
             stack.Children.Add(Ui.Text("No meeting with a patrol pair: check the stations (they must be on the section KM list) and the departure / arrival times, or the train ran outside the patrolling hours."));
@@ -34,7 +34,9 @@ public class ChartCheckPage : ContentPage
             Ui.Text($"{chart.Name}", 14, Ui.Primary, true),
             Ui.Text($"{r.FromStation} {Fmt.Time(r.Departure)} → {r.ToStation} {Fmt.Time(r.Arrival)}: {rows.Count(x => x.ExpectedKm is not null)} patrol pairs should have been met. " +
                     $"{ok} as per chart, {off} off position, {miss} not recorded in the report.", 13),
-            Ui.Muted("Meeting points assume an even speed between departure and arrival; a difference of about a kilometre is normal.")), Ui.Soft));
+            Ui.Muted(Patrol.UsesSchedule(r, data.Masters.Chainage, data.Trains)
+                ? $"Meeting points follow the schedule of train {r.TrainNo} (halts included), fitted to the actual departure and arrival."
+                : $"Meeting points assume an even speed between departure and arrival (train {r.TrainNo} is not in the timetable); a difference of about a kilometre is normal.")), Ui.Soft));
         foreach (var x in rows)
         {
             var color = x.Status switch { Patrol.AsPerChart => Ui.Ok, Patrol.OffPosition => Ui.Warn, _ => Colors.DimGray };

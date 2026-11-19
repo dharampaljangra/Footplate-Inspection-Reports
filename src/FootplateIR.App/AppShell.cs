@@ -24,6 +24,7 @@ public class AppShell : Shell
         Add("Reports", typeof(HomePage));
         Add("Import (text, photo, Word, PDF, Excel)", typeof(ImportPage));
         Add("Patrolmen & keymen on duty - call", typeof(DutyPage));
+        Add("Train timings & NTES", typeof(TimetablePage));
         Add("Locations to be attended", typeof(LocationsPage));
         Add("Patrolling chart & section KM", typeof(ChartPage));
         Add("Profile, lists & settings", typeof(ProfilePage));

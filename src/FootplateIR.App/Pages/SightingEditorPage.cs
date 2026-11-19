@@ -65,7 +65,7 @@ public class SightingEditorPage : ContentPage
         // Where the chart places the patrol pair when the train passes.
         var chart = data.Charts.FirstOrDefault(c => c.AppliesTo(night));
         var beatOnChart = chart?.Beats.FirstOrDefault(b => b.Contains(km.Value));
-        var time = Patrol.TimeAtKm(_r, data.Masters.Chainage, km.Value);
+        var time = Patrol.TimeAtKm(_r, data.Masters.Chainage, km.Value, data.Trains);
         if (chart is not null && beatOnChart is not null && time is TimeOnly t)
         {
             var pos = Patrol.PositionAt(chart, beatOnChart, Patrol.NightMinutes(t));
