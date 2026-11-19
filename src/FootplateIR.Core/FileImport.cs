@@ -17,6 +17,7 @@ public sealed class ImportResult
     public string Text { get; set; } = "";
     public List<InspectionReport> Reports { get; } = new();
     public List<DutyRoster> Rosters { get; } = new();
+    public List<TrainSchedule> Trains { get; } = new();
     /// <summary>True when the reports came from data embedded by this app (exact copy).</summary>
     public bool Exact { get; set; }
     public AppData? Backup { get; set; }
@@ -24,7 +25,7 @@ public sealed class ImportResult
 
     public string Summary =>
         Backup is not null ? $"Backup: {Backup.Reports.Count} reports, {Backup.Rosters.Count} duty lists."
-        : $"{Reports.Count} inspection report(s), {Rosters.Count} duty list(s) found" + (Exact ? " (exact copy saved by this app)." : ".");
+        : $"{Reports.Count} inspection report(s), {Rosters.Count} duty list(s), {Trains.Count} train schedule(s) found" + (Exact ? " (exact copy saved by this app)." : ".");
 }
 
 /// <summary>Reads reports and duty lists from text, Word, PDF, Excel, HTML and backup files.</summary>
@@ -64,6 +65,8 @@ public static class FileImport
                 break;
             case ".xlsx" or ".xlsm":
                 res.Text = ReadExcel(path, out embedded);
+                if (embedded is null)
+                    try { res.Trains.AddRange(Timetable.ReadExcel(path, data.Masters)); } catch (Exception ex) { res.Messages.Add("Timetable sheet not read: " + ex.Message); }
                 break;
             case ".html" or ".htm":
                 var html = File.ReadAllText(path, Encoding.UTF8);
@@ -98,13 +101,19 @@ public static class FileImport
     {
         res.Reports.Clear();
         res.Rosters.Clear();
+        var excelTrains = res.Trains.Where(t => t.Source == "Excel").ToList();
+        res.Trains.Clear();
+        res.Trains.AddRange(excelTrains);
         var text = res.Text ?? "";
         var parsed = ReportParser.Parse(text, data.Profile, data.Masters, res.Source);
         res.Reports.AddRange(parsed.Reports);
         // Duty lists: the whole text when it is not a report, or the messages of a chat that are not reports.
         var rest = res.Reports.Count == 0 ? text : string.Join("\n", ReportParser.SplitMessages(text).Where(c => !ReportParser.LooksLikeReport(c)));
         if (Patrol.LooksLikeRoster(rest)) res.Rosters.AddRange(Patrol.ParseRosters(rest, res.Source));
-        if (res.Reports.Count == 0 && res.Rosters.Count == 0)
+        if (res.Trains.Count == 0 && Timetable.LooksLikeTimetable(rest)) res.Trains.AddRange(Timetable.Parse(rest, data.Masters, res.Source));
+        foreach (var t in res.Trains)
+            res.Messages.Add($"Train {t.Title}: {t.Stops.Count} stops, {t.Route}");
+        if (res.Reports.Count == 0 && res.Rosters.Count == 0 && res.Trains.Count == 0)
             res.Messages.Add("No inspection report or duty list was recognised. Check the text below (correct any OCR mistakes) and read it again.");
         else
             res.Messages.AddRange(parsed.Reports.Count > 0 ? parsed.Messages : new List<string>());

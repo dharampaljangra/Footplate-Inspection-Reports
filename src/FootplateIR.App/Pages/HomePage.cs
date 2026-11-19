@@ -24,7 +24,8 @@ public class HomePage : ContentPage
             Ui.Wrap(
                 Ui.Button("+ New report", NewReport),
                 Ui.Button("Import (WhatsApp text / photo / file)", () => AppShell.GoAsync<ImportPage>(), false),
-                Ui.Button("Who is on duty here? (call)", () => AppShell.GoAsync<DutyPage>(), false)),
+                Ui.Button("Who is on duty here? (call)", () => AppShell.GoAsync<DutyPage>(), false),
+                Ui.Button("Train timings / NTES", () => AppShell.GoAsync<TimetablePage>(), false)),
             Ui.Card(Ui.Stack(
                 _sel,
                 _search,

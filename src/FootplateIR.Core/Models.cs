@@ -15,6 +15,8 @@ public sealed class AppData
     public List<PatrolChart> Charts { get; set; } = new() { Patrol.WinterChartKotaCor2026() };
     /// <summary>Night duty lists of patrolmen / keymen with mobile numbers.</summary>
     public List<DutyRoster> Rosters { get; set; } = new();
+    /// <summary>Train schedules (timetable) kept in the app.</summary>
+    public List<TrainSchedule> Trains { get; set; } = new();
     public Settings Settings { get; set; } = new();
 }
 
@@ -277,4 +279,5 @@ public static class Defaults
 [JsonSerializable(typeof(List<InspectionReport>))]
 [JsonSerializable(typeof(List<DutyRoster>))]
 [JsonSerializable(typeof(PatrolChart))]
+[JsonSerializable(typeof(List<TrainSchedule>))]
 public partial class FirJsonContext : JsonSerializerContext { }

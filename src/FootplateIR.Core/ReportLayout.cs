@@ -160,7 +160,7 @@ public static class ReportLayout
             var chart = data.Charts.FirstOrDefault(c => c.AppliesTo(night) && c.Beats.Count > 0);
             if (chart is not null)
             {
-                var rows = Patrol.Check(r, chart, data.Masters.Chainage, data.Rosters, data.Settings.ChartToleranceKm);
+                var rows = Patrol.Check(r, chart, data.Masters.Chainage, data.Rosters, data.Settings.ChartToleranceKm, data.Trains);
                 if (rows.Count > 0)
                 {
                     doc.Add(new SectionBlock { Text = $"{sec++}. Patrolling Chart Check ({chart.Name})" });
@@ -180,7 +180,13 @@ public static class ReportLayout
                         HighlightRows = rows.Select((x, i) => (x, i)).Where(t => t.x.Status is Patrol.OffPosition || t.x.Seen?.IsDeficient == true).Select(t => t.i).ToHashSet(),
                         FontSize = 8.5f
                     });
-                    doc.Add(new ParaBlock { Text = "Meeting points worked out from the departure and arrival times at an even speed; minor differences are expected.", Size = 8, Italic = true });
+                    doc.Add(new ParaBlock
+                    {
+                        Text = Patrol.UsesSchedule(r, data.Masters.Chainage, data.Trains)
+                            ? $"Meeting points worked out from the actual departure / arrival times and the schedule of train {r.TrainNo}; minor differences are expected."
+                            : "Meeting points worked out from the departure and arrival times at an even speed; minor differences are expected.",
+                        Size = 8, Italic = true
+                    });
                 }
             }
         }
