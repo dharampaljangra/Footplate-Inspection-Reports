@@ -149,7 +149,8 @@ public static class ReportParser
             if (st.Part != Part.Locations && Regex.IsMatch(t, Num + @"locations?\b", I) && (m = LocHead.Match(t)).Success)
             {
                 st.Part = Part.Locations;
-                st.LocText.Append(m.Groups[1].Value).Append(", ");
+                var colon = t.IndexOf(':');
+                if (colon >= 0) st.LocText.Append(t[(colon + 1)..]).Append(", ");   // list written on the heading line itself
                 continue;
             }
             if (st.Part is Part.Header or Part.Observations && Regex.IsMatch(t, Num + "short", I) && (m = ShortHead.Match(t)).Success)
@@ -612,7 +613,10 @@ public static class ReportParser
         if (h.Success)
         {
             body = h.Groups[2].Value.Trim();
-            if (Regex.IsMatch(h.Groups[1].Value, @"section|visibility|weather", I))
+            var head = h.Groups[1].Value.Trim();
+            if (Regex.IsMatch(head, @"^visibility$", I)) { r.Visibility = body.TrimEnd('.'); return; }
+            if (Regex.IsMatch(head, @"^weather$", I)) { AddWeather(r, body); return; }
+            if (Regex.IsMatch(head, @"section|visibility|weather", I))
             {
                 foreach (var sentence in Regex.Split(body, @"(?<=\.)\s+(?=[A-Z])"))
                     Single(r, sentence.Trim(), masters);

@@ -217,27 +217,32 @@ public static class Patrol
 
         foreach (var beat in chart.Beats)
         {
+            // Walk the run in quarter minutes; the train meets the pair where (train KM - patrol KM) changes sign.
             const double step = 0.25;
+            double lo = Math.Min(beat.FromKm, beat.ToKm), hi = Math.Max(beat.FromKm, beat.ToKm);
             double? prevDiff = null, prevNm = null;
             for (double nm = s; nm <= e + 1e-9; nm += step)
             {
                 var x = pos(nm);
                 var p = PositionAt(chart, beat, nm);
-                if (!beat.Contains(x) || p is null) { prevDiff = null; continue; }
+                if (p is null) { prevDiff = null; continue; }
                 var diff = x - p.Value;
-                if (Math.Abs(diff) < 0.02 || (prevDiff is double pd && Math.Sign(pd) != Math.Sign(diff)))
+                bool near = x >= lo - 2 && x <= hi + 2;
+                if (near && prevDiff is double pd && prevNm is double pn && (diff == 0 || Math.Sign(pd) != Math.Sign(diff)))
                 {
-                    var meetNm = prevDiff is double pd2 && Math.Abs(diff) >= 0.02 && prevNm is double pn
-                        ? pn + (nm - pn) * Math.Abs(pd2) / (Math.Abs(pd2) + Math.Abs(diff))
-                        : nm;
-                    rows.Add(new ChartCheckRow
+                    var meetNm = pn + (nm - pn) * Math.Abs(pd) / Math.Max(1e-9, Math.Abs(pd) + Math.Abs(diff));
+                    var meetKm = pos(meetNm);
+                    if (meetKm >= lo - 0.05 && meetKm <= hi + 0.05)
                     {
-                        Beat = beat,
-                        ExpectedKm = Math.Round(pos(meetNm), 2),
-                        ExpectedTime = FromNightMinutes(meetNm),
-                        OnDuty = duty.SelectMany(d => d.Beats).Where(b => b.Contains(beat.FromKm + 0.5 * (beat.ToKm - beat.FromKm))).SelectMany(b => b.Persons).ToList()
-                    });
-                    break;
+                        rows.Add(new ChartCheckRow
+                        {
+                            Beat = beat,
+                            ExpectedKm = Math.Round(Math.Clamp(meetKm, lo, hi), 2),
+                            ExpectedTime = FromNightMinutes(meetNm),
+                            OnDuty = duty.SelectMany(d => d.Beats).Where(b => b.Contains((lo + hi) / 2)).SelectMany(b => b.Persons).ToList()
+                        });
+                        break;
+                    }
                 }
                 prevDiff = diff;
                 prevNm = nm;
