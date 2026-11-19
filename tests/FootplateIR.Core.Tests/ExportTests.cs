@@ -109,3 +109,43 @@ public class ExportTests
         return p;
     }
 }
+
+/// <summary>Writes sample exports for a visual check when FIR_SAMPLES is set (the CI build uploads them).</summary>
+public class SampleOutput
+{
+    [Fact]
+    public void WriteSamples()
+    {
+        var dir = Environment.GetEnvironmentVariable("FIR_SAMPLES");
+        if (string.IsNullOrWhiteSpace(dir)) return;
+        Directory.CreateDirectory(dir);
+        var d = Store.New();
+        var reports = ReportParser.Parse(SampleTexts.WhatsApp, d.Profile, d.Masters).Reports;
+        var pdfNote = FileImport.Read(Path.Combine("Samples", "Night_Footplate_Inspection_Note_18.08.2026.pdf"), d).Reports;
+        reports.AddRange(pdfNote);
+        // A winter night with patrolmen recorded, to show the chart check.
+        var winter = reports[0].Clone();
+        winter.Id = Guid.NewGuid();
+        winter.Date = new DateOnly(2026, 12, 10);
+        winter.Purposes = new() { "Safety", "Winter" };
+        winter.Sightings = new()
+        {
+            new StaffSighting { Category = "Cold Weather Patrolman", Location = "35/10", Count = 2, Condition = "Alert", Jacket = "Worn" },
+            new StaffSighting { Category = "Cold Weather Patrolman", Location = "46/02", Count = 2, Condition = "Alert", Jacket = "Worn" },
+            new StaffSighting { Category = "Cold Weather Patrolman", Location = "61/08", Count = 2, Condition = "Sleeping", Jacket = "Not worn" },
+        };
+        reports.Add(winter);
+        d.Reports.AddRange(reports);
+        d.Rosters.AddRange(Patrol.ParseRosters(SampleTexts.Roster));
+        foreach (var f in new[] { ExportFormat.Pdf, ExportFormat.Word, ExportFormat.Excel, ExportFormat.Html, ExportFormat.Text })
+        {
+            File.WriteAllBytes(Path.Combine(dir, "Note_WhatsApp_report" + Export.Extension(f)), Export.Report(reports[1], d, f));
+            File.WriteAllBytes(Path.Combine(dir, "Note_winter_chart_check" + Export.Extension(f)), Export.Report(winter, d, f));
+        }
+        File.WriteAllBytes(Path.Combine(dir, "Note_from_PDF_18.08.2026.pdf"), Export.Report(pdfNote[0], d, ExportFormat.Pdf));
+        File.WriteAllBytes(Path.Combine(dir, "Register.pdf"), Export.Register(reports, d, ExportFormat.Pdf, "2026"));
+        File.WriteAllBytes(Path.Combine(dir, "Workbook.xlsx"), Export.Reports(reports, d, ExportFormat.Excel, "2026"));
+        File.WriteAllBytes(Path.Combine(dir, "Locations.pdf"), Export.Document(ReportLayout.LocationRegister(reports, d, "2026", false), ExportFormat.Pdf));
+        File.WriteAllBytes(Path.Combine(dir, "Duty_list.pdf"), Export.Document(ReportLayout.Roster(d.Rosters, d), ExportFormat.Pdf));
+    }
+}

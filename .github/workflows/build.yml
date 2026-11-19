@@ -31,7 +31,18 @@ jobs:
           java-version: '17'
 
       - name: Unit tests (reading the sample reports, duty lists and exports)
+        env:
+          FIR_SAMPLES: ${{ github.workspace }}/artifacts/samples
         run: dotnet test tests/FootplateIR.Core.Tests/FootplateIR.Core.Tests.csproj -c Release --logger "console;verbosity=detailed"
+
+      - name: Sample exports (for checking the layout)
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Sample-exports
+          retention-days: 7
+          path: artifacts/samples/
 
       - name: Publish Windows x64
         run: dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-windows10.0.19041.0 -o artifacts/windows
