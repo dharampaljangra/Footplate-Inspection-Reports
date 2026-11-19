@@ -48,6 +48,12 @@
   <!-- Reading text from photos on Android (Google ML Kit, works offline; Windows uses its own built-in OCR). -->
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
     <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.*" />
+    <!-- Align the AndroidX "ktx" packages that ML Kit brings with the newer AndroidX packages of MAUI
+         (otherwise the same Java classes come twice and the APK build stops). -->
+    <PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.*" />
+    <PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.*" />
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.11.*" />
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core.Ktx" Version="2.11.*" />
   </ItemGroup>
 
   <ItemGroup>
