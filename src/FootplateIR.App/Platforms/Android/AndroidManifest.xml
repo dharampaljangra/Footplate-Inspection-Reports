@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No INTERNET permission: the app works offline; reports leave the phone only when you share them. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+	<application android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:label="Footplate Inspection Reports"></application>
+	<!-- Camera: photograph a written / printed report or duty list to read it (OCR). -->
+	<uses-permission android:name="android.permission.CAMERA" />
+	<uses-feature android:name="android.hardware.camera" android:required="false" />
+	<queries>
+		<intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>
+		<!-- Call patrolmen / keymen from the duty list. -->
+		<intent><action android:name="android.intent.action.DIAL" /><data android:scheme="tel" /></intent>
+		<!-- WhatsApp chat with a patrolman (wa.me link). -->
+		<intent><action android:name="android.intent.action.VIEW" /><data android:scheme="https" /></intent>
+		<package android:name="com.whatsapp" />
+		<package android:name="com.whatsapp.w4b" />
+	</queries>
+	<uses-sdk />
+</manifest>
