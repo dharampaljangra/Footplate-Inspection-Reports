@@ -53,7 +53,7 @@ public class LocationsPage : ContentPage
                 Ui.Text(locs + (features.Length > 0 ? $"  ({features})" : ""), 15, Ui.Primary, true),
                 Ui.Text($"Reported {g.Items.Count} time(s): " + string.Join(", ", g.Items.Select(x => $"{Fmt.Date(x.Report.Date)} ({x.Report.TrainNo})")), 13),
                 Ui.Text(g.Pending > 0 ? "Pending" : "Attended" + (g.Items.Select(x => x.Loc.AttendedOn).Max() is DateOnly d ? " on " + Fmt.Date(d) : "") +
-                        (g.Items.Select(x => x.Loc.ActionTaken).FirstOrDefault(a => a.Length > 0) is string a ? " - " + a : ""), 13, g.Pending > 0 ? Ui.Warn : Ui.Ok, true),
+                        (g.Items.Select(x => x.Loc.ActionTaken).FirstOrDefault(t => t.Length > 0) is string act ? " - " + act : ""), 13, g.Pending > 0 ? Ui.Warn : Ui.Ok, true),
                 Ui.Wrap(
                     Ui.Small("Mark attended", () => Mark(group, LocationStatus.Attended)),
                     Ui.Small("Under watch", () => Mark(group, LocationStatus.Watch)),

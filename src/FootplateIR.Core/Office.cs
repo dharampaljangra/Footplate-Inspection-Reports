@@ -254,7 +254,10 @@ public static class XlsxRenderer
         ws.PageSetup.Margins.Left = ws.PageSetup.Margins.Right = 0.4;
         ws.PageSetup.Margins.Top = ws.PageSetup.Margins.Bottom = 0.5;
         ws.PageSetup.Footer.Left.AddText(doc.Footer);
-        ws.PageSetup.Footer.Right.AddText("Page &P of &N");
+        ws.PageSetup.Footer.Right.AddText("Page ");
+        ws.PageSetup.Footer.Right.AddText(XLHFPredefinedText.PageNumber);
+        ws.PageSetup.Footer.Right.AddText(" of ");
+        ws.PageSetup.Footer.Right.AddText(XLHFPredefinedText.NumberOfPages);
         ws.ShowGridLines = false;
 
         int row = 1;

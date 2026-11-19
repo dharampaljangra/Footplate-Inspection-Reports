@@ -49,27 +49,27 @@ public static class OcrService
 #if WINDOWS
     private static async Task<string> RecognizeWindowsAsync(string path)
     {
-        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
-        using var stream = await file.OpenAsync(Windows.Storage.FileAccessMode.Read);
-        var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
-        var max = Windows.Media.Ocr.OcrEngine.MaxImageDimension;
-        Windows.Graphics.Imaging.SoftwareBitmap bmp;
+        var file = await global::Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+        using var stream = await file.OpenAsync(global::Windows.Storage.FileAccessMode.Read);
+        var decoder = await global::Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
+        var max = global::Windows.Media.Ocr.OcrEngine.MaxImageDimension;
+        global::Windows.Graphics.Imaging.SoftwareBitmap bmp;
         if (decoder.PixelWidth > max || decoder.PixelHeight > max)
         {
             var scale = (double)max / Math.Max(decoder.PixelWidth, decoder.PixelHeight);
-            var transform = new Windows.Graphics.Imaging.BitmapTransform
+            var transform = new global::Windows.Graphics.Imaging.BitmapTransform
             {
                 ScaledWidth = (uint)(decoder.PixelWidth * scale),
                 ScaledHeight = (uint)(decoder.PixelHeight * scale)
             };
-            bmp = await decoder.GetSoftwareBitmapAsync(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
-                transform, Windows.Graphics.Imaging.ExifOrientationMode.RespectExifOrientation, Windows.Graphics.Imaging.ColorManagementMode.DoNotColorManage);
+            bmp = await decoder.GetSoftwareBitmapAsync(global::Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, global::Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied,
+                transform, global::Windows.Graphics.Imaging.ExifOrientationMode.RespectExifOrientation, global::Windows.Graphics.Imaging.ColorManagementMode.DoNotColorManage);
         }
         else
-            bmp = await decoder.GetSoftwareBitmapAsync(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+            bmp = await decoder.GetSoftwareBitmapAsync(global::Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, global::Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
 
-        var engine = Windows.Media.Ocr.OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en-US"))
-                     ?? Windows.Media.Ocr.OcrEngine.TryCreateFromUserProfileLanguages();
+        var engine = global::Windows.Media.Ocr.OcrEngine.TryCreateFromLanguage(new global::Windows.Globalization.Language("en-US"))
+                     ?? global::Windows.Media.Ocr.OcrEngine.TryCreateFromUserProfileLanguages();
         if (engine is null)
             throw new InvalidOperationException("Windows text recognition (OCR) for English is not installed. Add it in Settings > Time & language > Language > English > Optional features.");
         var result = await engine.RecognizeAsync(bmp);
@@ -82,30 +82,30 @@ public static class OcrService
 #if ANDROID
     private static async Task<string> RecognizeAndroidAsync(string path)
     {
-        var bounds = new Android.Graphics.BitmapFactory.Options { InJustDecodeBounds = true };
-        Android.Graphics.BitmapFactory.DecodeFile(path, bounds);
+        var bounds = new global::Android.Graphics.BitmapFactory.Options { InJustDecodeBounds = true };
+        global::Android.Graphics.BitmapFactory.DecodeFile(path, bounds);
         int sample = 1;
         while (Math.Max(bounds.OutWidth, bounds.OutHeight) / sample > 3200) sample *= 2;
-        var bitmap = Android.Graphics.BitmapFactory.DecodeFile(path, new Android.Graphics.BitmapFactory.Options { InSampleSize = sample })
+        var bitmap = global::Android.Graphics.BitmapFactory.DecodeFile(path, new global::Android.Graphics.BitmapFactory.Options { InSampleSize = sample })
                      ?? throw new InvalidOperationException("The photo could not be opened.");
         int rotation = 0;
         try
         {
 #pragma warning disable CA1422
-            var exif = new Android.Media.ExifInterface(path);
-            rotation = exif.GetAttributeInt(Android.Media.ExifInterface.TagOrientation, 1) switch { 6 => 90, 3 => 180, 8 => 270, _ => 0 };
+            var exif = new global::Android.Media.ExifInterface(path);
+            rotation = exif.GetAttributeInt(global::Android.Media.ExifInterface.TagOrientation, 1) switch { 6 => 90, 3 => 180, 8 => 270, _ => 0 };
 #pragma warning restore CA1422
         }
         catch { }
 
-        var image = Xamarin.Google.MLKit.Vision.Common.InputImage.FromBitmap(bitmap, rotation);
-        var recognizer = Xamarin.Google.MLKit.Vision.Text.TextRecognition.GetClient(
-            new Xamarin.Google.MLKit.Vision.Text.Latin.TextRecognizerOptions.Builder().Build());
-        var tcs = new TaskCompletionSource<Java.Lang.Object?>();
+        var image = global::Xamarin.Google.MLKit.Vision.Common.InputImage.FromBitmap(bitmap, rotation);
+        var recognizer = global::Xamarin.Google.MLKit.Vision.Text.TextRecognition.GetClient(
+            new global::Xamarin.Google.MLKit.Vision.Text.Latin.TextRecognizerOptions.Builder().Build());
+        var tcs = new TaskCompletionSource<global::Java.Lang.Object?>();
         var listener = new TaskListener(tcs);
         recognizer.Process(image).AddOnSuccessListener(listener).AddOnFailureListener(listener);
         var result = await tcs.Task;
-        if (result is not Xamarin.Google.MLKit.Vision.Text.Text text) return "";
+        if (result is not global::Xamarin.Google.MLKit.Vision.Text.Text text) return "";
         var sb = new StringBuilder();
         foreach (var block in text.TextBlocks)
         {
@@ -115,12 +115,12 @@ public static class OcrService
         return sb.ToString();
     }
 
-    private sealed class TaskListener : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener, Android.Gms.Tasks.IOnFailureListener
+    private sealed class TaskListener : global::Java.Lang.Object, global::Android.Gms.Tasks.IOnSuccessListener, global::Android.Gms.Tasks.IOnFailureListener
     {
-        private readonly TaskCompletionSource<Java.Lang.Object?> _tcs;
-        public TaskListener(TaskCompletionSource<Java.Lang.Object?> tcs) => _tcs = tcs;
-        public void OnSuccess(Java.Lang.Object? result) => _tcs.TrySetResult(result);
-        public void OnFailure(Java.Lang.Exception e) => _tcs.TrySetException(new InvalidOperationException("Text recognition failed: " + e.Message));
+        private readonly TaskCompletionSource<global::Java.Lang.Object?> _tcs;
+        public TaskListener(TaskCompletionSource<global::Java.Lang.Object?> tcs) => _tcs = tcs;
+        public void OnSuccess(global::Java.Lang.Object? result) => _tcs.TrySetResult(result);
+        public void OnFailure(global::Java.Lang.Exception e) => _tcs.TrySetException(new InvalidOperationException("Text recognition failed: " + e.Message));
     }
 #endif
 }
