@@ -44,6 +44,15 @@ jobs:
           retention-days: 7
           path: artifacts/samples/
 
+      - name: Print sample notes (base64, for checking the layout)
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          foreach ($f in @("Note_WhatsApp_report.pdf", "Note_winter_chart_check.pdf", "Register.pdf", "Note_WhatsApp_report.docx")) {
+            $p = Join-Path "artifacts/samples" $f
+            if (Test-Path $p) { Write-Output "=====BEGIN $f"; $b = [Convert]::ToBase64String([IO.File]::ReadAllBytes($p)); for ($i = 0; $i -lt $b.Length; $i += 4000) { Write-Output ("B64:" + $b.Substring($i, [Math]::Min(4000, $b.Length - $i))) }; Write-Output "=====END $f" }
+          }
+
       - name: Publish Windows x64
         run: dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-windows10.0.19041.0 -o artifacts/windows
 
