@@ -206,7 +206,9 @@ public static class PdfRenderer
             return max * lineH + 2 * pad;
         }
 
-        if (y + Height(t.Headers, true) + (t.Rows.Count > 0 ? Height(t.Rows[0], false) : 0) > bottom()) y = newPage();
+        // Start on a new page rather than leave the heading with one or two rows at the foot of a page.
+        var first = t.Rows.Take(3).Sum(r => Height(r, false));
+        if (y + Height(t.Headers, true) + first > bottom()) y = newPage();
         y += Row(t.Headers, true, null, y);
         for (int i = 0; i < t.Rows.Count; i++)
         {

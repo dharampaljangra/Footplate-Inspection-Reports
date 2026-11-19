@@ -116,7 +116,7 @@ public static class Patrol
 {
     public const string AsPerChart = "As per chart";
     public const string OffPosition = "Off position";
-    public const string NotNoticed = "Not noticed";
+    public const string NotNoticed = "Not recorded";
     public const string OutsideChart = "Not on chart";
 
     public static string KmText(double km)
@@ -260,7 +260,7 @@ public static class Patrol
             if (best.S is null)
             {
                 row.Status = NotNoticed;
-                row.Detail = $"{row.Beat.Patrolmen} should have been met near KM {KmText(row.ExpectedKm!.Value)} at about {Fmt.Time(row.ExpectedTime)} hrs; not recorded.";
+                row.Detail = $"{row.Beat.Patrolmen} ({row.Beat.Unit}) should have been met near KM {KmText(row.ExpectedKm!.Value)} at about {Fmt.Time(row.ExpectedTime)} hrs; not recorded in the report.";
                 continue;
             }
             used.Add(best.S);
@@ -291,7 +291,7 @@ public static class Patrol
     public static List<string> Shortcomings(IEnumerable<ChartCheckRow> rows) =>
         rows.Where(x => x.Status is NotNoticed or OffPosition)
             .Select(x => x.Status == NotNoticed
-                ? $"{x.Beat.Patrolmen} ({x.Beat.Range}) not noticed near KM {KmText(x.ExpectedKm!.Value)} at about {Fmt.Time(x.ExpectedTime)} hrs as per patrolling chart."
+                ? $"{x.Beat.Patrolmen} ({x.Beat.Unit}, {x.Beat.Range}) not noticed near KM {KmText(x.ExpectedKm!.Value)} at about {Fmt.Time(x.ExpectedTime)} hrs as per patrolling chart."
                 : $"{x.Beat.Patrolmen} met at {x.Seen!.Location} instead of near KM {KmText(x.ExpectedKm!.Value)} as per patrolling chart.")
             .ToList();
 

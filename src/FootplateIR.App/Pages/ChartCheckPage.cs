@@ -33,23 +33,27 @@ public class ChartCheckPage : ContentPage
         stack.Children.Add(Ui.Card(Ui.Stack(
             Ui.Text($"{chart.Name}", 14, Ui.Primary, true),
             Ui.Text($"{r.FromStation} {Fmt.Time(r.Departure)} → {r.ToStation} {Fmt.Time(r.Arrival)}: {rows.Count(x => x.ExpectedKm is not null)} patrol pairs should have been met. " +
-                    $"{ok} as per chart, {off} off position, {miss} not recorded.", 13),
+                    $"{ok} as per chart, {off} off position, {miss} not recorded in the report.", 13),
             Ui.Muted("Meeting points assume an even speed between departure and arrival; a difference of about a kilometre is normal.")), Ui.Soft));
         foreach (var x in rows)
         {
-            var color = x.Status switch { Patrol.AsPerChart => Ui.Ok, Patrol.OffPosition or Patrol.NotNoticed => Ui.Warn, _ => Colors.DimGray };
+            var color = x.Status switch { Patrol.AsPerChart => Ui.Ok, Patrol.OffPosition => Ui.Warn, _ => Colors.DimGray };
             var s = Ui.Stack(
                 Ui.Text($"{x.Beat.Patrolmen}   {x.Beat.Range}   ({x.Beat.Unit})", 14, Ui.Primary, true),
                 Ui.Text(x.Status, 13, color, true),
                 Ui.Text(x.Detail, 13));
             foreach (var p in x.OnDuty) s.Children.Add(DutyPage.PersonRow(p, ""));
             s.Spacing = 2;
-            stack.Children.Add(Ui.Card(s, x.Status is Patrol.NotNoticed or Patrol.OffPosition ? Ui.WarnBack : null));
+            stack.Children.Add(Ui.Card(s, x.Status is Patrol.OffPosition || x.Seen?.IsDeficient == true ? Ui.WarnBack : null));
         }
         stack.Children.Add(Ui.Wrap(
             Ui.Button("Add deviations to shortcomings", async () =>
             {
-                var lines = Patrol.Shortcomings(rows);
+                var offRows = rows.Where(x => x.Status == Patrol.OffPosition).ToList();
+                var missRows = rows.Where(x => x.Status == Patrol.NotNoticed).ToList();
+                var pick = await Ui.Choose("Add to shortcomings", $"Off position only ({offRows.Count})", $"Off position and not met ({offRows.Count + missRows.Count})");
+                if (pick is null) return;
+                var lines = Patrol.Shortcomings(pick.StartsWith("Off position only") ? offRows : offRows.Concat(missRows));
                 if (lines.Count == 0) { await Ui.Alert("Chart check", "No deviation to add."); return; }
                 addShortcomings(lines);
                 await Navigation.PopAsync();

@@ -170,12 +170,14 @@ public static class ReportLayout
                         Widths = new[] { 0.20f, 0.20f, 0.22f, 0.20f, 0.18f },
                         Rows = rows.Select(x => new[]
                         {
-                            x.Beat.Range, x.Beat.Patrolmen + (x.OnDuty.Count > 0 ? "\n" + string.Join(", ", x.OnDuty.Select(d => d.Display)) : ""),
+                            x.Beat.Range, x.Beat.Patrolmen + (x.Beat.Unit.Length > 0 ? $" ({x.Beat.Unit})" : "") + (x.OnDuty.Count > 0 ? "\n" + string.Join(", ", x.OnDuty.Select(d => d.Display)) : ""),
                             x.ExpectedKm is double ek ? $"KM {Patrol.KmText(ek)} / {Fmt.Time(x.ExpectedTime)}" : "-",
-                            x.Seen is null ? "-" : $"{KmDisplay(x.Seen.Location)} ({x.Seen.Count:00})",
+                            x.Seen is null ? "-" : $"{KmDisplay(x.Seen.Location)} ({x.Seen.Count:00})" +
+                                (x.Seen.Condition.Length > 0 && x.Seen.Condition != "Alert" ? ", " + x.Seen.Condition.ToLowerInvariant() : "") +
+                                (x.Seen.Jacket == "Not worn" ? ", no jacket" : ""),
                             x.Status
                         }).ToList(),
-                        HighlightRows = rows.Select((x, i) => (x, i)).Where(t => t.x.Status is Patrol.NotNoticed or Patrol.OffPosition).Select(t => t.i).ToHashSet(),
+                        HighlightRows = rows.Select((x, i) => (x, i)).Where(t => t.x.Status is Patrol.OffPosition || t.x.Seen?.IsDeficient == true).Select(t => t.i).ToHashSet(),
                         FontSize = 8.5f
                     });
                     doc.Add(new ParaBlock { Text = "Meeting points worked out from the departure and arrival times at an even speed; minor differences are expected.", Size = 8, Italic = true });
@@ -265,7 +267,7 @@ public static class ReportLayout
         var ordered = reports.OrderBy(r => r.Date).ThenBy(r => r.Departure).ToList();
         doc.Add(new TableBlock
         {
-            Headers = new[] { "S. No.", "Date", "Inspection", "Train", "From - To", "Dep.", "Arr.", "Duration", "Km", "Loco", "LP / ALP / TM", "Staff seen", "Deficient", "Short-comings", "Locations" },
+            Headers = new[] { "S. No.", "Date", "Inspection", "Train", "From - To", "Dep.", "Arr.", "Duration", "Km", "Loco", "LP / ALP / TM", "Staff seen", "Deficient", "Short-\ncomings", "Locations" },
             Widths = new[] { 0.035f, 0.065f, 0.12f, 0.05f, 0.075f, 0.04f, 0.04f, 0.05f, 0.04f, 0.09f, 0.17f, 0.05f, 0.055f, 0.055f, 0.06f },
             Rows = ordered.Select((r, i) => new[]
             {
