@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>FootplateIR.Core</RootNamespace>
+    <AssemblyName>FootplateIR.Core</AssemblyName>
+    <IsTrimmable>false</IsTrimmable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Excel and Word (OpenXML) read / write. ClosedXML brings DocumentFormat.OpenXml. -->
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <!-- Reading text from PDF reports (pure .NET, works on Windows and Android). -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Station codes and names (RBS network of WCR, same data as the Railway TA Diary app). -->
+    <EmbeddedResource Include="Data\rbs_wcr_network.txt" LogicalName="FootplateIR.Core.rbs_wcr_network.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FootplateIR.Core.Tests" />
+  </ItemGroup>
+
+</Project>

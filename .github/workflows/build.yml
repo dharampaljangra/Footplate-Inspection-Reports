@@ -1,0 +1,103 @@
+name: Build, test and sign
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      HAS_PFX: ${{ secrets.WINDOWS_PFX_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install .NET MAUI workload
+        run: dotnet workload install maui
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'microsoft'
+          java-version: '17'
+
+      - name: Unit tests (reading the sample reports, duty lists and exports)
+        run: dotnet test tests/FootplateIR.Core.Tests/FootplateIR.Core.Tests.csproj -c Release --logger "console;verbosity=detailed"
+
+      - name: Publish Windows x64
+        run: dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-windows10.0.19041.0 -o artifacts/windows
+
+      - name: Sign Windows build
+        if: env.HAS_PFX == 'true'
+        env:
+          WIN_PFX: ${{ secrets.WINDOWS_PFX_BASE64 }}
+          WIN_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\sign.pfx", [Convert]::FromBase64String($env:WIN_PFX))
+          ./build/sign-windows.ps1 -Folder artifacts/windows -PfxPath "$env:RUNNER_TEMP\sign.pfx" -PfxPassword $env:WIN_PFX_PASSWORD
+          Remove-Item "$env:RUNNER_TEMP\sign.pfx"
+
+      - name: Zip Windows build
+        shell: pwsh
+        run: Compress-Archive -Path artifacts/windows/* -DestinationPath artifacts/Footplate-Reports-Windows-x64.zip -Force
+
+      - name: Publish signed Android APK
+        env:
+          ANDROID_KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KS_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ($env:ANDROID_KS) {
+            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\footplate.keystore", [Convert]::FromBase64String($env:ANDROID_KS))
+            dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-android -o artifacts/android `
+              -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$env:RUNNER_TEMP\footplate.keystore" -p:AndroidSigningKeyAlias=footplate `
+              -p:AndroidSigningKeyPass=$env:ANDROID_KS_PASSWORD -p:AndroidSigningStorePass=$env:ANDROID_KS_PASSWORD
+            Remove-Item "$env:RUNNER_TEMP\footplate.keystore"
+          } else {
+            Write-Host "No ANDROID_KEYSTORE_BASE64 secret - building with the debug signing key."
+            dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-android -o artifacts/android
+          }
+          $apk = Get-ChildItem artifacts/android -Filter *-Signed.apk | Select-Object -First 1
+          Copy-Item $apk.FullName artifacts/Footplate-Reports-Android.apk -Force
+
+      - name: Checksums
+        shell: pwsh
+        run: Get-FileHash artifacts/*.zip, artifacts/*.apk -Algorithm SHA256 | ForEach-Object { "$($_.Hash)  $(Split-Path $_.Path -Leaf)" } | Out-File artifacts/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true   # account artifact storage may be full; Releases are the main download
+        with:
+          retention-days: 3
+          name: Footplate-Reports
+          path: |
+            artifacts/Footplate-Reports-Windows-x64.zip
+            artifacts/Footplate-Reports-Android.apk
+            artifacts/SHA256SUMS.txt
+
+      - name: GitHub Release (every successful build on main, or a version tag)
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          name: Footplate Inspection Reports ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            Footplate Inspection Reports - Windows x64 (zip, run FootplateIR.App.exe) and Android (APK).
+            Footplate inspection notes (official layout) with import from WhatsApp text, photos, Word, PDF and Excel;
+            export to PDF, Word, Excel, HTML and WhatsApp text; duty lists of patrolmen / keymen with calling; patrolling chart check.
+            Author: DHARAM PAL JANGID, Senior Section Engineer (P.Way) Kota Division of WCRly
+          files: |
+            artifacts/Footplate-Reports-Windows-x64.zip
+            artifacts/Footplate-Reports-Android.apk
+            artifacts/SHA256SUMS.txt
