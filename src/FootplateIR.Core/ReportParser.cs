@@ -167,7 +167,7 @@ public static class ReportParser
                 t = m.Groups[1].Value.Trim();
                 if (t.Length == 0) continue;
             }
-            else if (st.Part is Part.Observations or Part.Shortcomings or Part.Locations && Regex.IsMatch(t, Num + "remark", I) && (m = RemarksHead.Match(t)).Success)
+            else if (st.Part is Part.Observations or Part.Shortcomings or Part.Locations && Regex.IsMatch(t, @"^\s*\d{1,2}\s*[.)]\s*remarks?\b|^\s*remarks?\s*[:\-–]", I) && (m = RemarksHead.Match(t)).Success)
             {
                 st.Part = Part.Remarks;
                 t = m.Groups[1].Value.Trim();
