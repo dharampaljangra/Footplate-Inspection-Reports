@@ -234,6 +234,8 @@ public sealed class Masters
     public List<StationEntry> ExtraStations { get; set; } = new();
     /// <summary>Running KM of the stations on the section (used for the patrolling chart check and "who is on duty here").</summary>
     public List<StationKm> Chainage { get; set; } = Patrol.DefaultChainage();
+    /// <summary>OHE masts added in the app (stretches not in the built-in GQL - SMPA register).</summary>
+    public List<OheMast> ExtraMasts { get; set; } = new();
     public List<string> DutyCategories { get; set; } = new()
     {
         "Cold Weather Patrolman", "Monsoon Patrolman", "Hot Weather Patrolman", "Night Patrolman", "Keyman", "Stationary Watchman"

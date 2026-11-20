@@ -51,6 +51,7 @@ public class LocationsPage : ContentPage
             var features = string.Join("; ", g.Items.Select(x => x.Loc.Feature).Where(f => f.Length > 0).Distinct());
             var s = Ui.Stack(
                 Ui.Text(locs + (features.Length > 0 ? $"  ({features})" : ""), 15, Ui.Primary, true),
+                Ui.Muted(OheMasts.Describe(g.Items[0].Loc.Location)),
                 Ui.Text($"Reported {g.Items.Count} time(s): " + string.Join(", ", g.Items.Select(x => $"{Fmt.Date(x.Report.Date)} ({x.Report.TrainNo})")), 13),
                 Ui.Text(g.Pending > 0 ? "Pending" : "Attended" + (g.Items.Select(x => x.Loc.AttendedOn).Max() is DateOnly d ? " on " + Fmt.Date(d) : "") +
                         (g.Items.Select(x => x.Loc.ActionTaken).FirstOrDefault(t => t.Length > 0) is string act ? " - " + act : ""), 13, g.Pending > 0 ? Ui.Warn : Ui.Ok, true),

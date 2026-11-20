@@ -40,6 +40,8 @@ public static class Store
         d.Masters ??= new Masters();
         d.Settings ??= new Settings();
         d.Trains ??= new List<TrainSchedule>();
+        d.Masters.ExtraMasts ??= new List<OheMast>();
+        OheMasts.SetExtra(d.Masters.ExtraMasts);
         if (d.Masters.Chainage.Count == 0) d.Masters.Chainage = Patrol.DefaultChainage();
         if (d.Masters.StandardObservations.Count == 0) d.Masters.StandardObservations = new List<string>(Defaults.StandardObservations);
     }
@@ -102,6 +104,9 @@ public static class Store
         Union(m.TrainManagers, from.Masters.TrainManagers);
         Union(m.LocoTypes, from.Masters.LocoTypes);
         Union(m.Sheds, from.Masters.Sheds);
+        foreach (var mm in from.Masters.ExtraMasts.Where(x => m.ExtraMasts.All(y => OheMasts.Normal(y.Mast) != OheMasts.Normal(x.Mast))))
+            m.ExtraMasts.Add(mm);
+        OheMasts.SetExtra(m.ExtraMasts);
         foreach (var st in from.Masters.ExtraStations.Where(x => m.ExtraStations.All(y => !string.Equals(y.Code, x.Code, StringComparison.OrdinalIgnoreCase))))
             m.ExtraStations.Add(st);
         return s;
