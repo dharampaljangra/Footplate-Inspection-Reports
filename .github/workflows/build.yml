@@ -140,4 +140,5 @@ jobs:
           files: |
             artifacts/Footplate-Reports-Windows-x64.zip
             artifacts/Footplate-Reports-Android.apk
+            artifacts/Footplate-Publisher.cer
             artifacts/SHA256SUMS.txt
