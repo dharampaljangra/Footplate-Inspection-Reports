@@ -17,6 +17,8 @@ public class ChartPage : ContentPage
     private readonly Editor _beats = Ui.Editor("", "", 220);
     private readonly Editor _chainage = Ui.Editor("", "", 200);
     private readonly VerticalStackLayout _now = new() { Spacing = 2 };
+    private readonly Entry _mast = Ui.Entry("", "Mast 40/14, KM 48.75 or a location like 35/10-15");
+    private readonly VerticalStackLayout _mastResult = new() { Spacing = 2 };
     private AppData D => DataService.Current.Data;
     private PatrolChart? _cur;
 
@@ -37,6 +39,11 @@ public class ChartPage : ContentPage
                 _beats,
                 Ui.Button("Save chart", SaveChart))),
             Ui.Card(Ui.Stack(Ui.Heading("Where the patrol pairs should be now"), _now, Ui.Small("Refresh", () => { ShowNow(); return Task.CompletedTask; })), Ui.Soft),
+            Ui.Card(Ui.Stack(
+                Ui.Heading("OHE masts"),
+                Ui.Muted($"Mast register from the OHE layout plans: {OheMasts.Coverage}. Locations written as KM/mast (40/14, 35/10-15) are placed by it."),
+                Ui.Row(_mast, Ui.Small("Find", () => { FindMast(); return Task.CompletedTask; }, Ui.Primary, Colors.White)),
+                _mastResult)),
             Ui.Card(Ui.Stack(
                 Ui.Heading("Running KM of stations (chainage)"),
                 Ui.Muted("One per line: CODE KM  (e.g. BUDI 32.202). Used to place the train along the section."),
@@ -85,6 +92,27 @@ public class ChartPage : ContentPage
             var p = Patrol.PositionAt(_cur, b, nm);
             if (p is double km) _now.Children.Add(Ui.Text($"{b.Patrolmen} ({b.Unit}, {b.Range}): near KM {Patrol.KmText(km)}", 13));
         }
+    }
+
+    private void FindMast()
+    {
+        _mastResult.Children.Clear();
+        var q = (_mast.Text ?? "").Trim();
+        if (q.Length == 0) return;
+        if (OheMasts.Find(q) is OheMast m)
+            _mastResult.Children.Add(Ui.Text(m.Display, 14, Ui.Primary, true));
+        else if (OheMasts.Range(q) is { } r)
+            _mastResult.Children.Add(Ui.Text(r.FromRegister ? $"{q}: KM {r.From:0.000} - {r.To:0.000}" : $"{q}: not in the mast register; about KM {r.From:0.00} - {r.To:0.00} (average span)", 14));
+        double? km = double.TryParse(q.Replace("KM", "", StringComparison.OrdinalIgnoreCase).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var k) ? k
+            : OheMasts.Range(q)?.From;
+        if (km is double x)
+        {
+            _mastResult.Children.Add(Ui.Muted("Nearest masts:"));
+            foreach (var n in OheMasts.Near(x, 5)) _mastResult.Children.Add(Ui.Text($"{n.Display}   ({(n.Chainage - x) * 1000:+0;-0;0} m)", 13));
+            var st = D.Masters.Chainage.OrderBy(c => Math.Abs(c.Km - x)).FirstOrDefault();
+            if (st is not null) _mastResult.Children.Add(Ui.Muted($"Nearest station: {st.Code} (KM {st.Km:0.000}, {(x - st.Km) * 1000:+0;-0;0} m)"));
+        }
+        if (_mastResult.Children.Count == 0) _mastResult.Children.Add(Ui.Muted("Not found."));
     }
 
     private async Task SaveChart()

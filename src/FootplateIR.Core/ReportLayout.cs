@@ -103,7 +103,7 @@ public static class ReportLayout
             {
                 var rows = r.Sightings.Select((s, i) => new[]
                 {
-                    (i + 1).ToString(Fmt.Inv), s.Category, KmDisplay(s.Location), s.Count.ToString("00", Fmt.Inv), s.Condition.Length > 0 ? s.Condition : "-",
+                    (i + 1).ToString(Fmt.Inv), s.Category, KmDisplay(s.Location) + MastLine(s.Location), s.Count.ToString("00", Fmt.Inv), s.Condition.Length > 0 ? s.Condition : "-",
                     s.Jacket.Length > 0 ? s.Jacket : "-", s.Remarks
                 }).ToList();
                 doc.Add(new TableBlock
@@ -145,7 +145,7 @@ public static class ReportLayout
                 Widths = new[] { 0.08f, 0.24f, 0.40f, 0.28f },
                 Rows = r.Locations.Select((l, i) => new[]
                 {
-                    (i + 1).ToString(Fmt.Inv), KmDisplay(l.Location), l.Feature.Length > 0 ? l.Feature : "To be attended for better running",
+                    (i + 1).ToString(Fmt.Inv), KmDisplay(l.Location) + MastLine(l.Location), l.Feature.Length > 0 ? l.Feature : "To be attended for better running",
                     l.Status == LocationStatus.Attended ? "Attended" + (l.AttendedOn is DateOnly d ? " on " + Fmt.Date(d) : "") + (l.ActionTaken.Length > 0 ? " - " + l.ActionTaken : "")
                         : l.Status == LocationStatus.Watch ? "Under watch" : ""
                 }).ToList(),
@@ -213,6 +213,13 @@ public static class ReportLayout
             doc.Add(new SpacerBlock { Height = 6 });
             doc.Add(new ParaBlock { Lead = "Copy to: ", Text = string.Join("\n", p.CopyTo.Select((c, i) => $"{i + 1}. {c}")), Justify = false, Size = 9 });
         }
+    }
+
+    /// <summary>Second line with the KM of the OHE masts ("(35.492 - 35.825 km)") when they are in the mast register.</summary>
+    public static string MastLine(string loc)
+    {
+        var d = OheMasts.Describe(loc);
+        return d.Length > 0 ? "\n(" + d + ")" : "";
     }
 
     /// <summary>"KM 35/10-15" for KM locations, the text as written otherwise.</summary>
@@ -324,7 +331,7 @@ public static class ReportLayout
             Widths = new[] { 0.07f, 0.17f, 0.25f, 0.22f, 0.08f, 0.21f },
             Rows = groups.Select((g, i) => new[]
             {
-                (i + 1).ToString(Fmt.Inv), string.Join(", ", g.Items.Select(x => KmDisplay(x.Loc.Location)).Distinct()),
+                (i + 1).ToString(Fmt.Inv), string.Join(", ", g.Items.Select(x => KmDisplay(x.Loc.Location)).Distinct()) + MastLine(g.Items[0].Loc.Location),
                 string.Join("; ", g.Items.Select(x => x.Loc.Feature).Where(f => f.Length > 0).Distinct()),
                 string.Join(", ", g.Items.Select(x => Fmt.Date(x.Report.Date)).Distinct()),
                 g.Items.Count.ToString(Fmt.Inv),
