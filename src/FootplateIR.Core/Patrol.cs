@@ -144,9 +144,9 @@ public static class Patrol
         return st?.Km;
     }
 
-    /// <summary>KM 152/900 = 152.900; KM 40/14 = KM 40 + telegraph post 14 (about 20 posts to a km).</summary>
+    /// <summary>KM 152/900 = 152.900 (metres); KM 40/14 = OHE mast 40/14, placed from the mast register (average span where not listed).</summary>
     public static double ToKm(int km, int sub, int digits) =>
-        digits >= 3 ? km + sub / 1000.0 : km + Math.Min(sub, 24) / 25.0;
+        digits >= 3 ? km + sub / 1000.0 : sub == 0 ? km : OheMasts.KmOf(km, sub);
 
     /// <summary>Minutes from 18:00, so that a night (23:00 - 07:00) is one continuous range.</summary>
     public static double NightMinutes(TimeOnly t) => ((t.Hour * 60 + t.Minute + t.Second / 60.0) - 1080 + 1440) % 1440;
@@ -319,12 +319,12 @@ public static class Patrol
 
     // ------------------------------------------------------------------ built-in data
 
-    /// <summary>Chainage of the Kota - Chittaurgarh section stations (KM from GQL), from the Winter Patrolling Chart 2026-27
-    /// (GQL, THEA, BUDI, SNAR, JNRI, URML, SMPA, MLGH, BNDI, PSLI, BSSL, CNA) and RBS coaching distances for the rest.</summary>
+    /// <summary>Chainage of the Kota - Chittaurgarh section stations (KM from GQL), from the Winter Patrolling Chart 2026-27 and the
+    /// Kota Division map (GQL, GQL 'W' Cabin, THEA, BUDI, SNAR, JNRI, URML, SMPA, MLGH, BNDI, PSLI, BSSL, CNA) and RBS coaching distances for the rest.</summary>
     public static List<StationKm> DefaultChainage() => new()
     {
         new() { Code = "SGAC", Km = -8.27 }, new() { Code = "KOTA", Km = -5.56 }, new() { Code = "KCCN", Km = -3.25 },
-        new() { Code = "GQL", Km = 0.0 }, new() { Code = "GWCN", Km = 2.60 }, new() { Code = "DEIT", Km = 9.00 },
+        new() { Code = "GQL", Km = 0.0 }, new() { Code = "GWCN", Km = 1.703 }, new() { Code = "GQLW", Km = 1.703 }, new() { Code = "DEIT", Km = 9.00 },
         new() { Code = "THEA", Km = 18.280 }, new() { Code = "BUDI", Km = 32.202 }, new() { Code = "SNAR", Km = 42.501 },
         new() { Code = "NIMA", Km = 54.24 }, new() { Code = "JNRI", Km = 66.000 }, new() { Code = "URML", Km = 72.903 },
         new() { Code = "SMPA", Km = 79.564 }, new() { Code = "GNRD", Km = 91.78 }, new() { Code = "MLGH", Km = 100.401 },

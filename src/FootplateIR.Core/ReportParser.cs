@@ -38,6 +38,7 @@ public static class ReportParser
     private static readonly Regex ParenOnly = new(@"^\((?<p>[^)]{2,60})\)$");
     private static readonly Regex RouteRx = new(@"^(?:(?:ex|from)\s+)?(?<from>[A-Za-z]{2,5}(?:'[A-Za-z]')?)\s*(?:\bto\b|–|-)\s*(?<to>[A-Za-z]{2,5}(?:'[A-Za-z]')?)(?:\s+(?:by|in)\s+(?:train\s*(?:no\.?)?\s*)?(?<train>[0-9][0-9A-Z]{2,5}))?$", I);
     private static readonly Regex DateRx = new(@"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b");
+    private static readonly Regex MastNote = new(@"\(\s*\d{1,4}\.\d{3}(?:\s*-\s*\d{1,4}\.\d{3})?\s*km\s*\)", RegexOptions.IgnoreCase);
 
     private static readonly HashSet<string> Labels = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -141,7 +142,7 @@ public static class ReportParser
 
         foreach (var raw in chunk.Split('\n'))
         {
-            var t = raw.Trim();
+            var t = MastNote.Replace(raw, "").Trim();   // "(35.492 - 35.825 km)" printed under mast locations by this app
             if (t.Length == 0 || Salutation.IsMatch(t) || IsNoise(t)) continue;
             if (st.Part == Part.End) continue;
 

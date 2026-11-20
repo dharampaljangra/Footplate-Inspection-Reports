@@ -523,7 +523,7 @@ public static class XlsxRenderer
         foreach (var g in ReportLayout.LocationGroups(ordered))
             foreach (var (r, l) in g.Items)
             {
-                loc.Cell(lr, 1).Value = ReportLayout.KmDisplay(l.Location);
+                loc.Cell(lr, 1).Value = ReportLayout.KmDisplay(l.Location) + ReportLayout.MastLine(l.Location).Replace("\n", " ");
                 loc.Cell(lr, 2).Value = l.Feature;
                 loc.Cell(lr, 3).Value = r.Date.ToDateTime(TimeOnly.MinValue);
                 loc.Cell(lr, 3).Style.DateFormat.Format = "dd.mm.yyyy";
