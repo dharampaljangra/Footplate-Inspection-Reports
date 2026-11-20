@@ -607,6 +607,13 @@ public static class ReportParser
     {
         var flat = Regex.Replace(item, @"\s+", " ").Trim();
         if (flat.Length == 0) return;
+        var checks = Regex.Match(flat, @"^items\s+checked[^:]*:\s*(.+)$", I);
+        if (checks.Success)
+        {
+            foreach (var part in checks.Groups[1].Value.TrimEnd('.').Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (!r.Checks.Contains(part)) r.Checks.Add(part);
+            return;
+        }
         if (StaffWords.IsMatch(flat) && ParseStaff(r, item)) return;
 
         var body = flat;

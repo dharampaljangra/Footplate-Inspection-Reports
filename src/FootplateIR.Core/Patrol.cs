@@ -98,6 +98,13 @@ public sealed class DutyPerson
     [JsonIgnore] public string MobileDisplay => Mobile.Length == 10 ? $"{Mobile[..5]} {Mobile[5..]}" : Mobile;
 }
 
+/// <summary>One line of the chart check summary (a unit, or the total).</summary>
+public sealed record ChartSummaryRow(string Unit, int PairsDue, int AsPerChart, int MenAsPerChart, int OffChart, int MenOffChart,
+    int NotRecorded, int NotOnChart, int MenNotOnChart, int MenDeficient)
+{
+    public int MenSeen => MenAsPerChart + MenOffChart + MenNotOnChart;
+}
+
 /// <summary>A meeting of the train with a patrol pair as the chart says it should happen.</summary>
 public sealed class ChartCheckRow
 {
@@ -302,6 +309,32 @@ public static class Patrol
         }
         return rows.OrderBy(x => x.ExpectedKm ?? x.SeenKm ?? 0).ToList();
     }
+
+    /// <summary>
+    /// Summary of the chart check by unit (SSE section of the beats) with a total: patrol pairs due to be met,
+    /// found as per chart and off as per chart (pairs and men), not recorded, and seen where the chart has no pair.
+    /// </summary>
+    public static List<ChartSummaryRow> Summary(IEnumerable<ChartCheckRow> rows)
+    {
+        var list = rows.ToList();
+        ChartSummaryRow Make(string unit, List<ChartCheckRow> g) => new(
+            unit,
+            g.Count(x => x.ExpectedKm is not null),
+            g.Count(x => x.Status == AsPerChart), g.Where(x => x.Status == AsPerChart).Sum(x => x.Seen?.Count ?? 0),
+            g.Count(x => x.Status == OffPosition), g.Where(x => x.Status == OffPosition).Sum(x => x.Seen?.Count ?? 0),
+            g.Count(x => x.Status == NotNoticed),
+            g.Count(x => x.Status == OutsideChart), g.Where(x => x.Status == OutsideChart).Sum(x => x.Seen?.Count ?? 0),
+            g.Where(x => x.Seen?.IsDeficient == true).Sum(x => x.Seen!.Count));
+        var result = list.GroupBy(x => x.Beat.Unit.Length > 0 ? x.Beat.Unit : "-")
+            .OrderBy(g => g.Min(x => x.Beat.FromKm))
+            .Select(g => Make(g.Key, g.ToList())).ToList();
+        if (result.Count > 0) result.Add(Make("Total", list));
+        return result;
+    }
+
+    /// <summary>Totals of the chart check over many reports (e.g. a month), by unit, with a grand total.</summary>
+    public static List<ChartSummaryRow> SummaryOf(IEnumerable<IEnumerable<ChartCheckRow>> checks) =>
+        Summary(checks.SelectMany(c => c));
 
     /// <summary>Shortcoming lines for chart deviations, to add to the report.</summary>
     public static List<string> Shortcomings(IEnumerable<ChartCheckRow> rows) =>

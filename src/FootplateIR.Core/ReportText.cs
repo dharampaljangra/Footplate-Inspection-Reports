@@ -116,6 +116,7 @@ public static class ReportText
         if (r.LocoPilot.Trim().Length == 0) w.Add("Loco Pilot's name is blank.");
         if (r.Mobile.Trim().Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(r.Mobile.Trim(), @"^\+?\d[\d\s-]{8,13}$")) w.Add("Mobile number does not look right.");
         foreach (var s in r.Sightings.Where(s => s.Location.Trim().Length == 0)) w.Add($"A {s.Category} entry has no location.");
+        w.AddRange(Rules.Advice(r));
         return w;
     }
 }

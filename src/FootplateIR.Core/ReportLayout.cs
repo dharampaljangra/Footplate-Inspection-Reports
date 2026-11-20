@@ -103,7 +103,7 @@ public static class ReportLayout
             {
                 var rows = r.Sightings.Select((s, i) => new[]
                 {
-                    (i + 1).ToString(Fmt.Inv), s.Category, KmDisplay(s.Location) + MastLine(s.Location), s.Count.ToString("00", Fmt.Inv), s.Condition.Length > 0 ? s.Condition : "-",
+                    (i + 1).ToString(Fmt.Inv), s.Category, KmDisplay(s.Location), s.Count.ToString("00", Fmt.Inv), s.Condition.Length > 0 ? s.Condition : "-",
                     s.Jacket.Length > 0 ? s.Jacket : "-", s.Remarks
                 }).ToList();
                 doc.Add(new TableBlock
@@ -129,6 +129,8 @@ public static class ReportLayout
         if (r.Weather.Trim().Length > 0) sectionLines.Add($"Weather: {r.Weather.Trim().TrimEnd('.')}.");
         if (sectionLines.Count > 0)
             doc.Add(new ParaBlock { Number = $"{n++}.", Lead = "Section Condition / Visibility / Weather: ", Text = string.Join(" ", sectionLines) });
+        if (r.Checks.Count > 0)
+            doc.Add(new ParaBlock { Number = $"{n++}.", Lead = $"Items checked ({Rules.ChecksRef}): ", Text = string.Join("; ", r.Checks) + "." });
 
         // 4. Shortcomings
         doc.Add(new SectionBlock { Text = $"{sec++}. Shortcomings / Deficiencies Noted" });
@@ -180,6 +182,7 @@ public static class ReportLayout
                         HighlightRows = rows.Select((x, i) => (x, i)).Where(t => t.x.Status is Patrol.OffPosition || t.x.Seen?.IsDeficient == true).Select(t => t.i).ToHashSet(),
                         FontSize = 8.5f
                     });
+                    doc.Add(SummaryTable(Patrol.Summary(rows)));
                     doc.Add(new ParaBlock
                     {
                         Text = Patrol.UsesSchedule(r, data.Masters.Chainage, data.Trains)
@@ -220,6 +223,25 @@ public static class ReportLayout
     {
         var d = OheMasts.Describe(loc);
         return d.Length > 0 ? "\n(" + d + ")" : "";
+    }
+
+    /// <summary>Patrolmen found as per chart / off as per chart, by unit with the total.</summary>
+    public static TableBlock SummaryTable(List<ChartSummaryRow> rows)
+    {
+        static string PM(int pairs, int men) => pairs == 0 ? "-" : $"{pairs} ({men} men)";
+        return new TableBlock
+        {
+            Headers = new[] { "Unit", "Pairs due", "Found as per chart", "Off as per chart", "Not recorded", "Seen off beat", "Total men seen", "Men deficient" },
+            Widths = new[] { 0.10f, 0.10f, 0.16f, 0.16f, 0.11f, 0.13f, 0.12f, 0.12f },
+            Rows = rows.Select(x => new[]
+            {
+                x.Unit, x.PairsDue.ToString(Fmt.Inv), PM(x.AsPerChart, x.MenAsPerChart), PM(x.OffChart, x.MenOffChart),
+                x.NotRecorded.ToString(Fmt.Inv), PM(x.NotOnChart, x.MenNotOnChart), x.MenSeen.ToString(Fmt.Inv), x.MenDeficient.ToString(Fmt.Inv)
+            }).ToList(),
+            BoldColumns = new[] { 0 },
+            CenterColumns = new[] { 1, 2, 3, 4, 5, 6, 7 },
+            FontSize = 8.5f
+        };
     }
 
     /// <summary>"KM 35/10-15" for KM locations, the text as written otherwise.</summary>
@@ -305,6 +327,17 @@ public static class ReportLayout
                    $"{ordered.Sum(r => r.Shortcomings.Count)} shortcomings and {ordered.Sum(r => r.Locations.Count)} locations reported for attention.",
             Size = 9
         });
+        // Patrolling chart check of all inspections of the period in force under a chart.
+        var checks = ordered.Select(r => (r, chart: data.Charts.FirstOrDefault(c => c.Beats.Count > 0 && c.AppliesTo(Patrol.NightOf(r.Date, r.Departure)))))
+            .Where(x => x.chart is not null)
+            .Select(x => Patrol.Check(x.r, x.chart!, data.Masters.Chainage, data.Rosters, data.Settings.ChartToleranceKm, data.Trains))
+            .Where(c => c.Count > 0).ToList();
+        if (checks.Count > 0)
+        {
+            doc.Add(new SpacerBlock { Height = 6 });
+            doc.Add(new ParaBlock { Lead = "Patrolling chart check: ", Text = $"patrolmen found as per chart and off as per chart in {checks.Count} inspection(s) under a patrolling chart.", Size = 9 });
+            doc.Add(SummaryTable(Patrol.SummaryOf(checks)));
+        }
         doc.Add(new SpacerBlock { Height = 16 });
         doc.Add(new SignatureBlock { Lines = new[] { $"({p.Name})", p.Designation } });
         return doc;

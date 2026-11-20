@@ -45,6 +45,7 @@ public class ReportEditorPage : ContentPage
     private readonly Editor _staffNote = Ui.Editor("", "En-route Gate Keepers, Stationary Watchmen and Monsoon Patrolmen were checked as under:", 50);
     private readonly VerticalStackLayout _sightings = new() { Spacing = 4 };
     private readonly Dictionary<string, CheckBox> _std = new();
+    private readonly Dictionary<string, CheckBox> _checks = new();
     private readonly Editor _otherObs = Ui.Editor("", "Other observations - one per line");
     private readonly Entry _visibility = Ui.Entry();
     private readonly Entry _weather = Ui.Entry("", "e.g. Light rain from BUDI to GQL'W'");
@@ -78,6 +79,14 @@ public class ReportEditorPage : ContentPage
             tap.Tapped += (_, _) => cb.IsChecked = !cb.IsChecked;
             l.GestureRecognizers.Add(tap);
             stdStack.Children.Add(Ui.Row(cb, l));
+        }
+
+        var checkFlow = Ui.Stack();
+        foreach (var c in Rules.NightFootplateChecks.Concat(_r.Checks).Distinct())
+        {
+            var cb = new CheckBox { IsChecked = _r.Checks.Contains(c), Color = Ui.Primary };
+            _checks[c] = cb;
+            checkFlow.Children.Add(Ui.Check(cb, c));
         }
 
         Fill();
@@ -125,8 +134,14 @@ public class ReportEditorPage : ContentPage
                 Ui.Field("Other observations", _otherObs),
                 Ui.Cols(Ui.Field("Visibility", Ui.Suggest(_visibility, () => m.Visibility, "Visibility")), Ui.Field("Weather", _weather)))),
             Ui.Card(Ui.Stack(
+                Ui.Heading("Items checked (IRPWM 2024 Table-1B Sl. 14)"),
+                Ui.Muted("Night foot plate inspection: once in a month, preferably between 00.00 and 04.00 hrs. Ticked items are printed in the note."),
+                checkFlow,
+                Ui.Small("Rules for the footplate (IRPWM, G&SR)", () => Navigation.PushAsync(new RulesPage())))),
+            Ui.Card(Ui.Stack(
                 Ui.Heading("5. Shortcomings / deficiencies"),
                 _shortcomings,
+                Ui.Small("+ Standard shortcoming with rule reference", AddStandardShortcoming),
                 Ui.Heading("6. Locations to be attended for better running"),
                 Ui.Muted("Separate by commas or new lines. Write the nature in brackets: 61/12(SEJ), 63/03(Low joint). Compliance is recorded under 'Locations to be attended'."),
                 _locations,
@@ -212,6 +227,7 @@ public class ReportEditorPage : ContentPage
         _r.TrainManager = Fmt.CleanName(_tm.Text);
         _r.TmHq = (_tmHq.Text ?? "").Trim();
         _r.FieldStaffNote = (_staffNote.Text ?? "").Trim();
+        _r.Checks = _checks.Where(c => c.Value.IsChecked).Select(c => c.Key).ToList();
         _r.Observations = _std.Where(s => s.Value.IsChecked).Select(s => s.Key).Concat(Ui.Lines(_otherObs.Text)).ToList();
         _r.Visibility = (_visibility.Text ?? "").Trim();
         _r.Weather = (_weather.Text ?? "").Trim();
@@ -315,6 +331,21 @@ public class ReportEditorPage : ContentPage
             Collect();
             _shortcomings.Text = string.Join("\n", _r.Shortcomings.Concat(lines.Where(l => !_r.Shortcomings.Contains(l))));
         }));
+    }
+
+    private async Task AddStandardShortcoming()
+    {
+        var items = Rules.StandardShortcomings.Select(s => $"{s.Text} ({s.Ref})").ToArray();
+        var pick = await Ui.Choose("Standard shortcoming", items);
+        if (pick is null) return;
+        var text = pick;
+        if (text.Contains("__"))
+        {
+            var where = await Ui.Prompt("Location", "KM / LC / station to put in place of __", "");
+            if (where is null) return;
+            text = text.Replace("__", where.Trim());
+        }
+        _shortcomings.Text = string.Join("\n", Ui.Lines(_shortcomings.Text).Append(text));
     }
 
     private Task SuggestRemarks()
