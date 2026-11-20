@@ -167,7 +167,7 @@ public static class ReportParser
                 t = m.Groups[1].Value.Trim();
                 if (t.Length == 0) continue;
             }
-            else if (st.Part is Part.Observations or Part.Shortcomings or Part.Locations && Regex.IsMatch(t, Num + "remark", I) && (m = RemarksHead.Match(t)).Success)
+            else if (st.Part is Part.Observations or Part.Shortcomings or Part.Locations && Regex.IsMatch(t, @"^\s*\d{1,2}\s*[.)]\s*remarks?\b|^\s*remarks?\s*[:\-–]", I) && (m = RemarksHead.Match(t)).Success)
             {
                 st.Part = Part.Remarks;
                 t = m.Groups[1].Value.Trim();
@@ -607,6 +607,13 @@ public static class ReportParser
     {
         var flat = Regex.Replace(item, @"\s+", " ").Trim();
         if (flat.Length == 0) return;
+        var checks = Regex.Match(flat, @"^items\s+checked[^:]*:\s*(.+)$", I);
+        if (checks.Success)
+        {
+            foreach (var part in checks.Groups[1].Value.TrimEnd('.').Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (!r.Checks.Contains(part)) r.Checks.Add(part);
+            return;
+        }
         if (StaffWords.IsMatch(flat) && ParseStaff(r, item)) return;
 
         var body = flat;
