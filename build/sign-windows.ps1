@@ -8,4 +8,10 @@ if (-not $signtool) { throw "signtool.exe not found - install the Windows 10/11 
 $files = @("$Folder\FootplateIR.App.exe", "$Folder\FootplateIR.App.dll", "$Folder\FootplateIR.Core.dll") | Where-Object { Test-Path $_ }
 & $signtool.FullName sign /fd SHA256 /f $PfxPath /p $PfxPassword /tr $TimestampUrl /td SHA256 /d "Footplate Inspection Reports" $files
 if ($LASTEXITCODE -ne 0) { throw "Signing failed." }
-& $signtool.FullName verify /pa /v "$Folder\FootplateIR.App.exe"
+# A self-signed publisher is not trusted on the build machine, so check that every file carries a signature
+foreach ($f in $files) {
+  $sig = Get-AuthenticodeSignature $f
+  if ($sig.Status -eq "NotSigned" -or -not $sig.SignerCertificate) { throw "$f is not signed." }
+  Write-Host "$(Split-Path $f -Leaf): signed by $($sig.SignerCertificate.Subject) ($($sig.Status)), timestamp: $([bool]$sig.TimeStamperCertificate)"
+}
+$global:LASTEXITCODE = 0

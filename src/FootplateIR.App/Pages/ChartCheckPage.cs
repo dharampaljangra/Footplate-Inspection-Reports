@@ -37,6 +37,22 @@ public class ChartCheckPage : ContentPage
             Ui.Muted(Patrol.UsesSchedule(r, data.Masters.Chainage, data.Trains)
                 ? $"Meeting points follow the schedule of train {r.TrainNo} (halts included), fitted to the actual departure and arrival."
                 : $"Meeting points assume an even speed between departure and arrival (train {r.TrainNo} is not in the timetable); a difference of about a kilometre is normal.")), Ui.Soft));
+        // Summary: found as per chart / off as per chart, by unit with the total.
+        var sum = Patrol.Summary(rows);
+        var grid = new Grid { ColumnSpacing = 6, RowSpacing = 2 };
+        string[] head = { "Unit", "Due", "As per chart", "Off chart", "Not rec.", "Off beat", "Men seen" };
+        for (int c = 0; c < head.Length; c++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = c == 0 ? GridLength.Auto : GridLength.Star });
+        for (int c = 0; c < head.Length; c++) grid.Add(Ui.Text(head[c], 12, Ui.Primary, true), c, 0);
+        for (int i = 0; i < sum.Count; i++)
+        {
+            var x = sum[i];
+            bool total = x.Unit == "Total";
+            string[] cells = { x.Unit, x.PairsDue.ToString(Ui.Inv), $"{x.AsPerChart} ({x.MenAsPerChart})", $"{x.OffChart} ({x.MenOffChart})",
+                               x.NotRecorded.ToString(Ui.Inv), $"{x.NotOnChart} ({x.MenNotOnChart})", x.MenSeen.ToString(Ui.Inv) };
+            for (int c = 0; c < cells.Length; c++) grid.Add(Ui.Text(cells[c], 12, c == 3 && x.OffChart > 0 ? Ui.Warn : null, total), c, i + 1);
+        }
+        stack.Children.Add(Ui.Card(Ui.Stack(Ui.Heading("Summary"), Ui.Muted("Patrol pairs (men in brackets)."), grid)));
+
         foreach (var x in rows)
         {
             var color = x.Status switch { Patrol.AsPerChart => Ui.Ok, Patrol.OffPosition => Ui.Warn, _ => Colors.DimGray };

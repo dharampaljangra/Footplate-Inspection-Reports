@@ -13,8 +13,6 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    env:
-      HAS_PFX: ${{ secrets.WINDOWS_PFX_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,15 +55,29 @@ jobs:
         run: dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-windows10.0.19041.0 -o artifacts/windows
 
       - name: Sign Windows build
-        if: env.HAS_PFX == 'true'
         env:
           WIN_PFX: ${{ secrets.WINDOWS_PFX_BASE64 }}
           WIN_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
         shell: pwsh
         run: |
-          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\sign.pfx", [Convert]::FromBase64String($env:WIN_PFX))
-          ./build/sign-windows.ps1 -Folder artifacts/windows -PfxPath "$env:RUNNER_TEMP\sign.pfx" -PfxPassword $env:WIN_PFX_PASSWORD
-          Remove-Item "$env:RUNNER_TEMP\sign.pfx"
+          $pfx = "$env:RUNNER_TEMP\sign.pfx"
+          if ($env:WIN_PFX) {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String(($env:WIN_PFX -replace '\s', '')))
+            $pass = "$env:WIN_PFX_PASSWORD".Trim()
+            Write-Host "Signing with the certificate from the WINDOWS_PFX_BASE64 secret."
+          } else {
+            Write-Host "::warning::WINDOWS_PFX_BASE64 secret not set - signing with a temporary self-signed certificate."
+            $pass = [Guid]::NewGuid().ToString("N")
+            $c = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=DHARAM PAL JANGID, O=Senior Section Engineer (P.Way) Kota Division of WCRly, C=IN" `
+                 -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(5)
+            Export-PfxCertificate -Cert $c -FilePath $pfx -Password (ConvertTo-SecureString $pass -AsPlainText -Force) | Out-Null
+          }
+          ./build/sign-windows.ps1 -Folder artifacts/windows -PfxPath $pfx -PfxPassword $pass
+          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($pfx, $pass)
+          [IO.File]::WriteAllBytes("$PWD\artifacts\windows\Footplate-Publisher.cer", $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+          Copy-Item artifacts/windows/Footplate-Publisher.cer artifacts/Footplate-Publisher.cer
+          Write-Host "Publisher: $($cert.Subject)  Thumbprint: $($cert.Thumbprint)"
+          Remove-Item $pfx
 
       - name: Zip Windows build
         shell: pwsh
@@ -75,16 +87,22 @@ jobs:
         env:
           ANDROID_KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KS_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         shell: pwsh
         run: |
           if ($env:ANDROID_KS) {
-            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\footplate.keystore", [Convert]::FromBase64String($env:ANDROID_KS))
+            $alias = if ($env:ANDROID_KS_ALIAS) { "$env:ANDROID_KS_ALIAS".Trim() } else { "footplate" }
+            $env:ANDROID_KS_PASSWORD = "$env:ANDROID_KS_PASSWORD".Trim()
+            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\footplate.keystore", [Convert]::FromBase64String(($env:ANDROID_KS -replace '\s', '')))
+            keytool -list -keystore "$env:RUNNER_TEMP\footplate.keystore" -storepass $env:ANDROID_KS_PASSWORD -alias $alias | Out-Host
+            if ($LASTEXITCODE -ne 0) { throw "Keystore could not be opened with ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS." }
             dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-android -o artifacts/android `
-              -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$env:RUNNER_TEMP\footplate.keystore" -p:AndroidSigningKeyAlias=footplate `
+              -p:AndroidKeyStore=true -p:AndroidSigningKeyStore="$env:RUNNER_TEMP\footplate.keystore" -p:AndroidSigningKeyAlias=$alias `
               -p:AndroidSigningKeyPass=$env:ANDROID_KS_PASSWORD -p:AndroidSigningStorePass=$env:ANDROID_KS_PASSWORD
             Remove-Item "$env:RUNNER_TEMP\footplate.keystore"
+            Write-Host "APK signed with the release keystore from secrets."
           } else {
-            Write-Host "No ANDROID_KEYSTORE_BASE64 secret - building with the debug signing key."
+            Write-Host "::warning::No ANDROID_KEYSTORE_BASE64 secret - APK signed with the debug key (updates may need uninstalling first)."
             dotnet publish src/FootplateIR.App/FootplateIR.App.csproj -c Release -f net10.0-android -o artifacts/android
           }
           $apk = Get-ChildItem artifacts/android -Filter *-Signed.apk | Select-Object -First 1
@@ -92,7 +110,7 @@ jobs:
 
       - name: Checksums
         shell: pwsh
-        run: Get-FileHash artifacts/*.zip, artifacts/*.apk -Algorithm SHA256 | ForEach-Object { "$($_.Hash)  $(Split-Path $_.Path -Leaf)" } | Out-File artifacts/SHA256SUMS.txt
+        run: Get-FileHash artifacts/*.zip, artifacts/*.apk, artifacts/*.cer -Algorithm SHA256 | ForEach-Object { "$($_.Hash)  $(Split-Path $_.Path -Leaf)" } | Out-File artifacts/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         continue-on-error: true   # account artifact storage may be full; Releases are the main download
@@ -102,6 +120,7 @@ jobs:
           path: |
             artifacts/Footplate-Reports-Windows-x64.zip
             artifacts/Footplate-Reports-Android.apk
+            artifacts/Footplate-Publisher.cer
             artifacts/SHA256SUMS.txt
 
       - name: GitHub Release (every successful build on main, or a version tag)
@@ -116,8 +135,10 @@ jobs:
             Footplate Inspection Reports - Windows x64 (zip, run FootplateIR.App.exe) and Android (APK).
             Footplate inspection notes (official layout) with import from WhatsApp text, photos, Word, PDF and Excel;
             export to PDF, Word, Excel, HTML and WhatsApp text; duty lists of patrolmen / keymen with calling; patrolling chart check.
+            Windows files are code-signed (SHA-256, timestamped); install Footplate-Publisher.cer as Trusted Publisher to trust them. The APK is signed with the release key.
             Author: DHARAM PAL JANGID, Senior Section Engineer (P.Way) Kota Division of WCRly
           files: |
             artifacts/Footplate-Reports-Windows-x64.zip
             artifacts/Footplate-Reports-Android.apk
+            artifacts/Footplate-Publisher.cer
             artifacts/SHA256SUMS.txt

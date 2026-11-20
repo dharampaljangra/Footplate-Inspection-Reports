@@ -98,6 +98,13 @@ public sealed class DutyPerson
     [JsonIgnore] public string MobileDisplay => Mobile.Length == 10 ? $"{Mobile[..5]} {Mobile[5..]}" : Mobile;
 }
 
+/// <summary>One line of the chart check summary (a unit, or the total).</summary>
+public sealed record ChartSummaryRow(string Unit, int PairsDue, int AsPerChart, int MenAsPerChart, int OffChart, int MenOffChart,
+    int NotRecorded, int NotOnChart, int MenNotOnChart, int MenDeficient)
+{
+    public int MenSeen => MenAsPerChart + MenOffChart + MenNotOnChart;
+}
+
 /// <summary>A meeting of the train with a patrol pair as the chart says it should happen.</summary>
 public sealed class ChartCheckRow
 {
@@ -146,10 +153,9 @@ public static class Patrol
         return st?.Km;
     }
 
-    /// <summary>KM 152/900 = 152.900; KM 40/14 not in the mast register = KM 40 + mast 14 (about 16 - 20 masts to a km).</summary>
-    /// <remarks>Masts not in the register are placed at the average found in it: KM + 0.020 + 0.047 x mast number (median error about 50 m).</remarks>
+    /// <summary>KM 152/900 = 152.900 (metres); KM 40/14 = OHE mast 40/14, placed from the mast register (average span where not listed).</summary>
     public static double ToKm(int km, int sub, int digits) =>
-        digits >= 3 ? km + sub / 1000.0 : sub == 0 ? km : km + 0.020 + 0.047 * sub;
+        digits >= 3 ? km + sub / 1000.0 : sub == 0 ? km : OheMasts.KmOf(km, sub);
 
     /// <summary>Minutes from 18:00, so that a night (23:00 - 07:00) is one continuous range.</summary>
     public static double NightMinutes(TimeOnly t) => ((t.Hour * 60 + t.Minute + t.Second / 60.0) - 1080 + 1440) % 1440;
@@ -306,6 +312,32 @@ public static class Patrol
         return rows.OrderBy(x => x.ExpectedKm ?? x.SeenKm ?? 0).ToList();
     }
 
+    /// <summary>
+    /// Summary of the chart check by unit (SSE section of the beats) with a total: patrol pairs due to be met,
+    /// found as per chart and off as per chart (pairs and men), not recorded, and seen where the chart has no pair.
+    /// </summary>
+    public static List<ChartSummaryRow> Summary(IEnumerable<ChartCheckRow> rows)
+    {
+        var list = rows.ToList();
+        ChartSummaryRow Make(string unit, List<ChartCheckRow> g) => new(
+            unit,
+            g.Count(x => x.ExpectedKm is not null),
+            g.Count(x => x.Status == AsPerChart), g.Where(x => x.Status == AsPerChart).Sum(x => x.Seen?.Count ?? 0),
+            g.Count(x => x.Status == OffPosition), g.Where(x => x.Status == OffPosition).Sum(x => x.Seen?.Count ?? 0),
+            g.Count(x => x.Status == NotNoticed),
+            g.Count(x => x.Status == OutsideChart), g.Where(x => x.Status == OutsideChart).Sum(x => x.Seen?.Count ?? 0),
+            g.Where(x => x.Seen?.IsDeficient == true).Sum(x => x.Seen!.Count));
+        var result = list.GroupBy(x => x.Beat.Unit.Length > 0 ? x.Beat.Unit : "-")
+            .OrderBy(g => g.Min(x => x.Beat.FromKm))
+            .Select(g => Make(g.Key, g.ToList())).ToList();
+        if (result.Count > 0) result.Add(Make("Total", list));
+        return result;
+    }
+
+    /// <summary>Totals of the chart check over many reports (e.g. a month), by unit, with a grand total.</summary>
+    public static List<ChartSummaryRow> SummaryOf(IEnumerable<IEnumerable<ChartCheckRow>> checks) =>
+        Summary(checks.SelectMany(c => c));
+
     /// <summary>Shortcoming lines for chart deviations, to add to the report.</summary>
     public static List<string> Shortcomings(IEnumerable<ChartCheckRow> rows) =>
         rows.Where(x => x.Status is NotNoticed or OffPosition)
@@ -322,8 +354,8 @@ public static class Patrol
 
     // ------------------------------------------------------------------ built-in data
 
-    /// <summary>Chainage of the Kota - Chittaurgarh section stations (KM from GQL), from the Winter Patrolling Chart 2026-27
-    /// (GQL, THEA, BUDI, SNAR, JNRI, URML, SMPA, MLGH, BNDI, PSLI, BSSL, CNA) and RBS coaching distances for the rest.</summary>
+    /// <summary>Chainage of the Kota - Chittaurgarh section stations (KM from GQL), from the Winter Patrolling Chart 2026-27 and the
+    /// Kota Division map (GQL, GQL 'W' Cabin, THEA, BUDI, SNAR, JNRI, URML, SMPA, MLGH, BNDI, PSLI, BSSL, CNA) and RBS coaching distances for the rest.</summary>
     public static List<StationKm> DefaultChainage() => new()
     {
         new() { Code = "SGAC", Km = -8.27 }, new() { Code = "KOTA", Km = -5.56 }, new() { Code = "KCCN", Km = -3.25 },

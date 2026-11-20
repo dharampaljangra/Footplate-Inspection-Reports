@@ -38,6 +38,7 @@ public static class ReportParser
     private static readonly Regex ParenOnly = new(@"^\((?<p>[^)]{2,60})\)$");
     private static readonly Regex RouteRx = new(@"^(?:(?:ex|from)\s+)?(?<from>[A-Za-z]{2,5}(?:'[A-Za-z]')?)\s*(?:\bto\b|–|-)\s*(?<to>[A-Za-z]{2,5}(?:'[A-Za-z]')?)(?:\s+(?:by|in)\s+(?:train\s*(?:no\.?)?\s*)?(?<train>[0-9][0-9A-Z]{2,5}))?$", I);
     private static readonly Regex DateRx = new(@"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b");
+    private static readonly Regex MastNote = new(@"\(\s*\d{1,4}\.\d{3}(?:\s*-\s*\d{1,4}\.\d{3})?\s*km\s*\)", RegexOptions.IgnoreCase);
 
     private static readonly HashSet<string> Labels = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -141,7 +142,7 @@ public static class ReportParser
 
         foreach (var raw in chunk.Split('\n'))
         {
-            var t = raw.Trim();
+            var t = MastNote.Replace(raw, "").Trim();   // "(35.492 - 35.825 km)" printed under mast locations by this app
             if (t.Length == 0 || Salutation.IsMatch(t) || IsNoise(t)) continue;
             if (st.Part == Part.End) continue;
 
@@ -166,7 +167,7 @@ public static class ReportParser
                 t = m.Groups[1].Value.Trim();
                 if (t.Length == 0) continue;
             }
-            else if (st.Part is Part.Observations or Part.Shortcomings or Part.Locations && Regex.IsMatch(t, Num + "remark", I) && (m = RemarksHead.Match(t)).Success)
+            else if (st.Part is Part.Observations or Part.Shortcomings or Part.Locations && Regex.IsMatch(t, @"^\s*\d{1,2}\s*[.)]\s*remarks?\b|^\s*remarks?\s*[:\-–]", I) && (m = RemarksHead.Match(t)).Success)
             {
                 st.Part = Part.Remarks;
                 t = m.Groups[1].Value.Trim();
@@ -574,7 +575,8 @@ public static class ReportParser
             return;
         }
         // Mast / chainage line printed under the location by this app (it may wrap into pieces).
-        if (Regex.IsMatch(t, @"^(OHE\s+\d|ch\.\s*\d)", I) || Regex.IsMatch(t, @"^\d{1,3}\.\d{3}(\s*-\s*\d{1,3}\.\d{3})?$")) return;
+        if (Regex.IsMatch(t, @"^(OHE\s+\d|ch\.\s*\d)", I) ||
+            Regex.IsMatch(t, @"^\d{1,3}\.\d{3}(\s*-\s*\d{1,3}\.\d{3})?(\s*km)?\)?$", I)) return;
         if (Regex.IsMatch(t, @"^\d{1,3}\.?$")) { st.LocCol = 1; return; }   // serial number cell: a new row follows
         var last = r.Locations.Count > 0 ? r.Locations[^1] : null;
         bool looksLoc = Regex.IsMatch(t, @"^KM\b", I) || Locations.IsKm(t);
@@ -608,6 +610,13 @@ public static class ReportParser
     {
         var flat = Regex.Replace(item, @"\s+", " ").Trim();
         if (flat.Length == 0) return;
+        var checks = Regex.Match(flat, @"^items\s+checked[^:]*:\s*(.+)$", I);
+        if (checks.Success)
+        {
+            foreach (var part in checks.Groups[1].Value.TrimEnd('.').Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (!r.Checks.Contains(part)) r.Checks.Add(part);
+            return;
+        }
         if (StaffWords.IsMatch(flat) && ParseStaff(r, item)) return;
 
         var body = flat;

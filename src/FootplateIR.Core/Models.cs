@@ -30,6 +30,8 @@ public sealed class Settings
     public string SyncFolder { get; set; } = "";
     public DateTime? LastSyncUtc { get; set; }
     public int SchemaVersion { get; set; } = 1;
+    /// <summary>Whose inspection schedule applies (IRPWM 2024 Table-1A / 1B).</summary>
+    public string Role { get; set; } = Rules.RoleInCharge;
 }
 
 public sealed class Tombstone
@@ -107,6 +109,8 @@ public sealed class InspectionReport
     public List<string> Observations { get; set; } = new();
     public string Visibility { get; set; } = "Clear throughout";
     public string Weather { get; set; } = "";
+    /// <summary>Items checked on the run as per IRPWM 2024 Table-1B Sl. 14 (alertness of gatemen, patrolmen ..., riding quality).</summary>
+    public List<string> Checks { get; set; } = new();
 
     // ---- Shortcomings and follow-up ----
     public List<string> Shortcomings { get; set; } = new();
@@ -271,6 +275,7 @@ public static class Defaults
         Section = p.Section,
         FieldStaffNote = FieldStaffNote,
         Observations = new List<string>(m.StandardObservations),
+        Checks = new List<string>(Rules.NightFootplateChecks),
         Kind = DateTime.Now.Hour is >= 6 and < 18 ? "Day Footplate Inspection" : "Night Footplate Inspection"
     };
 }
