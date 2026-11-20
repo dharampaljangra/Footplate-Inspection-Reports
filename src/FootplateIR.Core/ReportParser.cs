@@ -573,7 +573,8 @@ public static class ReportParser
             st.LocText.Append(t).Append(", ");
             return;
         }
-        if (Regex.IsMatch(t, @"^OHE\s+\d.*\bch\.", I)) return;   // mast / chainage line printed under the location by this app
+        // Mast / chainage line printed under the location by this app (it may wrap into pieces).
+        if (Regex.IsMatch(t, @"^(OHE\s+\d|ch\.\s*\d)", I) || Regex.IsMatch(t, @"^\d{1,3}\.\d{3}(\s*-\s*\d{1,3}\.\d{3})?$")) return;
         if (Regex.IsMatch(t, @"^\d{1,3}\.?$")) { st.LocCol = 1; return; }   // serial number cell: a new row follows
         var last = r.Locations.Count > 0 ? r.Locations[^1] : null;
         bool looksLoc = Regex.IsMatch(t, @"^KM\b", I) || Locations.IsKm(t);

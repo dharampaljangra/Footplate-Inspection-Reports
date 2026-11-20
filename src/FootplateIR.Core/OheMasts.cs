@@ -83,7 +83,7 @@ public static class OheMasts
     {
         var (a, b) = Range(location);
         if (a is null) return "";
-        if (b is null || ReferenceEquals(a, b)) return $"OHE {a.Mast}, ch. {a.Chainage:0.000}" + (a.Type.Length > 0 ? $" ({a.Type})" : "");
+        if (b is null || ReferenceEquals(a, b)) return $"OHE {a.Mast}, ch. {a.Chainage:0.000}";
         return $"OHE {a.Mast} - {b.Mast}, ch. {a.Chainage:0.000} - {b.Chainage:0.000}";
     }
 
