@@ -55,6 +55,8 @@ public class SightingEditorPage : ContentPage
         var km = Patrol.KmOf(_loc.Text ?? "", data.Masters.Chainage);
         if (km is null) { _duty.Children.Add(Ui.Muted("Enter a KM (e.g. 48/17) or station code to see the patrolmen / keymen on duty and call them.")); return; }
         if (OheMasts.Find(_loc.Text ?? "") is OheMast mast) _duty.Children.Add(Ui.Muted(mast.Display));
+        if (OheMasts.Range(_loc.Text ?? "") is { FromRegister: true } mastRange && Math.Abs(mastRange.To - mastRange.From) > 0.0005)
+            _duty.Children.Add(Ui.Muted(OheMasts.Describe(_loc.Text ?? "")));
         var night = Patrol.NightOf(_r.Date, _r.Departure);
         var list = Patrol.OnDutyAt(data.Rosters, km.Value, night, _r.Date);
         if (list.Count == 0) _duty.Children.Add(Ui.Muted($"No duty list for the night of {Patrol.NightText(night)} covers KM {Patrol.KmText(km.Value)}. Import tonight's list under 'Patrolmen & keymen on duty'."));

@@ -17,7 +17,7 @@
   <ItemGroup>
     <!-- Station codes and names (RBS network of WCR, same data as the Railway TA Diary app). -->
     <EmbeddedResource Include="Data\rbs_wcr_network.txt" LogicalName="FootplateIR.Core.rbs_wcr_network.txt" />
-    <!-- OHE mast register from the OHE layout plans (same data as the Track Machine Progress app). -->
+    <!-- OHE mast register from the OHE layout plans (LOP), GQL - SMPA (same data as the Track Machine Progress app). -->
     <EmbeddedResource Include="Data\ohe_masts_kota.csv" LogicalName="FootplateIR.Core.ohe_masts_kota.csv" />
   </ItemGroup>
 

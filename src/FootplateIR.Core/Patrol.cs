@@ -143,8 +143,10 @@ public static class Patrol
     public static double? KmOf(string location, IEnumerable<StationKm>? chainage = null)
     {
         var s = (location ?? "").Trim();
-        var m = Regex.Match(s, @"^(?:KM\.?\s*)?(\d{1,4})(?:\s*/\s*(\d{1,3}))?", RegexOptions.IgnoreCase);
-        if (m.Success && (m.Groups[2].Success || Regex.IsMatch(s, @"^KM", RegexOptions.IgnoreCase)))
+        // Locations are written as OHE mast numbers (KM/mast): the mast register gives the exact chainage.
+        if (OheMasts.Find(s) is OheMast mast) return mast.Chainage;
+        var m = Regex.Match(s, @"^(?:KM\.?|OHE\.?|MAST|M)?\s*[-.:]?\s*(\d{1,4})(?:\s*/\s*(\d{1,3}))?", RegexOptions.IgnoreCase);
+        if (m.Success && (m.Groups[2].Success || Regex.IsMatch(s, @"^(KM|OHE|MAST|M)\b", RegexOptions.IgnoreCase)))
             return ToKm(int.Parse(m.Groups[1].Value, Fmt.Inv), m.Groups[2].Success ? int.Parse(m.Groups[2].Value, Fmt.Inv) : 0, m.Groups[2].Value.Length);
         var code = Regex.Match(s.ToUpperInvariant(), @"^[A-Z]{2,5}").Value;
         var st = chainage?.FirstOrDefault(c => string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase));

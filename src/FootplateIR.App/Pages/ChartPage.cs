@@ -17,8 +17,9 @@ public class ChartPage : ContentPage
     private readonly Editor _beats = Ui.Editor("", "", 220);
     private readonly Editor _chainage = Ui.Editor("", "", 200);
     private readonly VerticalStackLayout _now = new() { Spacing = 2 };
-    private readonly Entry _mast = Ui.Entry("", "Mast 40/14, KM 48.75 or a location like 35/10-15");
+    private readonly Entry _mastQuery = Ui.Entry("", "Mast (40/14) or chainage (40.85)");
     private readonly VerticalStackLayout _mastResult = new() { Spacing = 2 };
+    private readonly Editor _mastCsv = Ui.Editor("", "Mast,Km,Metre,Chainage,MastType,Line,Drawing\n80/1,80,40.5,80.0405,B-150,,80-85 LOP", 80);
     private AppData D => DataService.Current.Data;
     private PatrolChart? _cur;
 
@@ -41,9 +42,13 @@ public class ChartPage : ContentPage
             Ui.Card(Ui.Stack(Ui.Heading("Where the patrol pairs should be now"), _now, Ui.Small("Refresh", () => { ShowNow(); return Task.CompletedTask; })), Ui.Soft),
             Ui.Card(Ui.Stack(
                 Ui.Heading("OHE masts"),
-                Ui.Muted($"Mast register from the OHE layout plans: {OheMasts.Coverage}. Locations written as KM/mast (40/14, 35/10-15) are placed by it."),
-                Ui.Row(_mast, Ui.Small("Find", () => { FindMast(); return Task.CompletedTask; }, Ui.Primary, Colors.White)),
-                _mastResult)),
+                Ui.Muted($"Mast register from {OheMasts.Source}: {OheMasts.Coverage}" + (D.Masters.ExtraMasts.Count > 0 ? $" + {D.Masters.ExtraMasts.Count} added" : "") +
+                         ". Locations written as KM/mast (40/14, 35/10-15) are placed at the mast's exact chainage."),
+                Ui.Row(_mastQuery, Ui.Small("Find", () => { FindMast(); return Task.CompletedTask; }, Ui.Primary, Colors.White)),
+                _mastResult,
+                Ui.Muted("Add masts of other stretches (e.g. SMPA - COR) - paste the rows of the OHE layout plan register (same columns as above) or choose a CSV file."),
+                _mastCsv,
+                Ui.Wrap(Ui.Small("Add pasted masts", AddMasts), Ui.Small("Choose CSV file", PickMasts)))),
             Ui.Card(Ui.Stack(
                 Ui.Heading("Running KM of stations (chainage)"),
                 Ui.Muted("One per line: CODE KM  (e.g. BUDI 32.202). Used to place the train along the section."),
@@ -97,7 +102,7 @@ public class ChartPage : ContentPage
     private void FindMast()
     {
         _mastResult.Children.Clear();
-        var q = (_mast.Text ?? "").Trim();
+        var q = (_mastQuery.Text ?? "").Trim();
         if (q.Length == 0) return;
         if (OheMasts.Find(q) is OheMast m)
             _mastResult.Children.Add(Ui.Text(m.Display, 14, Ui.Primary, true));
@@ -171,6 +176,55 @@ public class ChartPage : ContentPage
         D.Charts.Remove(_cur);
         await DataService.Current.SaveAsync();
         Fill();
+    }
+
+    private void FindMast()
+    {
+        _mastResult.Children.Clear();
+        var q = (_mastQuery.Text ?? "").Trim();
+        if (q.Length == 0) return;
+        if (OheMasts.Find(q) is OheMast m)
+        {
+            _mastResult.Children.Add(Ui.Text($"OHE {m.Mast}: chainage {m.Chainage:0.000} km" + (m.Type.Length > 0 ? $", mast type {m.Type}" : "") +
+                                             (m.Drawing.Length > 0 ? $", LOP {m.Drawing}" : ""), 13, Ui.Primary, true));
+            ShowNear(m.Chainage);
+            return;
+        }
+        if (double.TryParse(q, NumberStyles.Float, CultureInfo.InvariantCulture, out var ch)) { ShowNear(ch); return; }
+        _mastResult.Children.Add(Ui.Text("Not in the register.", 13, Ui.Warn));
+    }
+
+    private void ShowNear(double ch)
+    {
+        var near = OheMasts.All.OrderBy(x => Math.Abs(x.Chainage - ch)).Take(5).OrderBy(x => x.Chainage);
+        _mastResult.Children.Add(Ui.Muted("Nearby: " + string.Join(",  ", near.Select(x => $"{x.Mast} ({x.Chainage:0.000})"))));
+        var st = D.Masters.Chainage.OrderBy(x => Math.Abs(x.Km - ch)).FirstOrDefault();
+        if (st is not null) _mastResult.Children.Add(Ui.Muted($"Nearest station {st.Code} ({Stations.NameOf(st.Code, D.Masters)}) at KM {st.Km:0.000}, {Math.Abs(st.Km - ch):0.00} km away."));
+    }
+
+    private async Task AddMasts()
+    {
+        var list = OheMasts.Parse(_mastCsv.Text ?? "");
+        if (list.Count == 0) { await Ui.Alert("OHE masts", "No mast row understood. Columns: Mast, Km, Metre, Chainage, MastType, Line, Drawing."); return; }
+        var extra = D.Masters.ExtraMasts;
+        foreach (var m in list)
+        {
+            extra.RemoveAll(x => OheMasts.Normal(x.Mast) == m.Mast);
+            extra.Add(m);
+        }
+        OheMasts.SetExtra(extra);
+        await DataService.Current.SaveAsync();
+        _mastCsv.Text = "";
+        await Ui.Alert("OHE masts", $"{list.Count} masts added. The register now has {OheMasts.Count} masts.");
+    }
+
+    private async Task PickMasts()
+    {
+        var f = await FileService.PickAsync("OHE mast register (CSV)", new[] { ".csv", ".txt" }, new[] { "text/csv", "text/plain", "text/comma-separated-values" });
+        if (f is null) return;
+        var path = await FileService.ToCacheAsync(f);
+        _mastCsv.Text = await File.ReadAllTextAsync(path);
+        await AddMasts();
     }
 
     private async Task SaveChainage()

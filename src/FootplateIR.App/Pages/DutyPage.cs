@@ -7,7 +7,7 @@ namespace FootplateIR.App.Pages;
 public class DutyPage : ContentPage
 {
     private readonly DatePicker _night = new() { Format = "dd.MM.yyyy" };
-    private readonly Entry _km = Ui.Entry("", "KM (48/17) or station code (BUDI)");
+    private readonly Entry _km = Ui.Entry("", "OHE mast / KM (48/17) or station code (BUDI)");
     private readonly VerticalStackLayout _here = new() { Spacing = 4 };
     private readonly VerticalStackLayout _lists = new() { Spacing = 4 };
     private AppData D => DataService.Current.Data;
@@ -64,6 +64,7 @@ public class DutyPage : ContentPage
             if ((_km.Text ?? "").Trim().Length > 0) _here.Children.Add(Ui.Text("Not understood - write a KM like 48/17 or 48, or a station code of the section.", 13, Ui.Warn));
             return;
         }
+        if (OheMasts.Describe(_km.Text) is { Length: > 0 } mastInfo) _here.Children.Add(Ui.Muted(mastInfo));
         var found = Patrol.OnDutyAt(D.Rosters, km.Value, Night, Night.AddDays(1));
         found.AddRange(Patrol.OnDutyAt(D.Rosters.Where(r => !r.IsNight), km.Value, Night, Night).Where(x => found.All(f => f.Beat != x.Beat)));
         if (found.Count == 0) _here.Children.Add(Ui.Muted($"No saved list covers KM {Patrol.KmText(km.Value)} for this date."));
